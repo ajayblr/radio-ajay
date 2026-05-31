@@ -6,53 +6,57 @@ interface Props {
   loading: boolean;
   error: string | null;
   onTogglePlay: () => void;
+  onNext: () => void;
+  onPrev: () => void;
   onVolume: (v: number) => void;
   onToggleMute: () => void;
   isFavorite?: boolean;
   onFavorite?: () => void;
 }
 
-export default function Player({ playerState, loading, error, onTogglePlay, onVolume, onToggleMute, isFavorite, onFavorite }: Props) {
+export default function Player({ playerState, loading, error, onTogglePlay, onNext, onPrev, onVolume, onToggleMute, isFavorite, onFavorite }: Props) {
   const { station, isPlaying, volume, isMuted } = playerState;
 
   return (
     <div className="border-t shrink-0" style={{ background: 'var(--sp-surface)', borderColor: 'var(--sp-border)' }}>
 
-      {/* Mobile layout — single compact row */}
-      <div className="flex sm:hidden items-center gap-3 px-3 py-2">
-        {/* Artwork */}
-        <div className="w-11 h-11 rounded shrink-0 overflow-hidden" style={{ background: '#333' }}>
-          {station?.favicon
-            ? <img src={station.favicon} alt={station.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-            : <div className="w-full h-full flex items-center justify-center"><Radio size={16} style={{ color: 'var(--sp-muted)' }} /></div>}
+      {/* Mobile layout — two rows */}
+      <div className="flex sm:hidden flex-col px-3 pt-2 pb-1 gap-1">
+        {/* Row 1: artwork + name + heart */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded shrink-0 overflow-hidden" style={{ background: '#333' }}>
+            {station?.favicon
+              ? <img src={station.favicon} alt={station.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              : <div className="w-full h-full flex items-center justify-center"><Radio size={14} style={{ color: 'var(--sp-muted)' }} /></div>}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate" style={{ color: 'var(--sp-text)' }}>{station?.name ?? 'No station'}</p>
+            <p className="text-xs truncate" style={{ color: 'var(--sp-muted)' }}>
+              {error
+                ? <span style={{ color: '#f55' }}>Unavailable</span>
+                : station ? [station.country, station.codec].filter(Boolean).join(' · ') : 'Select a station'}
+            </p>
+          </div>
+          <button onClick={onFavorite} className="shrink-0" style={{ color: isFavorite ? 'var(--sp-green)' : 'var(--sp-subtle)' }}>
+            <Heart size={17} fill={isFavorite ? 'currentColor' : 'none'} />
+          </button>
         </div>
 
-        {/* Name */}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-white truncate">{station?.name ?? 'No station'}</p>
-          <p className="text-xs truncate" style={{ color: 'var(--sp-muted)' }}>
-            {error
-              ? <span style={{ color: '#f55' }}>Unavailable</span>
-              : station ? [station.country, station.codec].filter(Boolean).join(' · ') : 'Select a station'}
-          </p>
+        {/* Row 2: playback controls */}
+        <div className="flex items-center justify-center gap-6 py-1">
+          <CtrlBtn icon={SkipBack} onClick={onPrev} />
+          <button
+            onClick={onTogglePlay}
+            disabled={!station || !!error}
+            className="w-9 h-9 rounded-full flex items-center justify-center text-black shrink-0 transition-all disabled:opacity-40"
+            style={{ background: 'var(--sp-text)' }}
+          >
+            {loading ? <Loader2 size={16} className="animate-spin" />
+              : isPlaying ? <Pause size={16} fill="currentColor" />
+              : <Play size={16} fill="currentColor" className="ml-0.5" />}
+          </button>
+          <CtrlBtn icon={SkipForward} onClick={onNext} />
         </div>
-
-        {/* Heart */}
-        <button onClick={onFavorite} className="shrink-0 transition-all" style={{ color: isFavorite ? 'var(--sp-green)' : 'var(--sp-subtle)' }}>
-          <Heart size={18} fill={isFavorite ? 'currentColor' : 'none'} />
-        </button>
-
-        {/* Play/Pause */}
-        <button
-          onClick={onTogglePlay}
-          disabled={!station || !!error}
-          className="w-9 h-9 rounded-full flex items-center justify-center text-black shrink-0 transition-all disabled:opacity-40"
-          style={{ background: 'var(--sp-text)' }}
-        >
-          {loading ? <Loader2 size={16} className="animate-spin" />
-            : isPlaying ? <Pause size={16} fill="currentColor" />
-            : <Play size={16} fill="currentColor" className="ml-0.5" />}
-        </button>
       </div>
 
       {/* Tablet / Desktop layout — 3-column Spotify style */}
@@ -88,7 +92,7 @@ export default function Player({ playerState, loading, error, onTogglePlay, onVo
         <div className="flex-1 flex flex-col items-center gap-2 max-w-[40%]">
           <div className="flex items-center gap-4 md:gap-6">
             <CtrlBtn icon={Shuffle} className="hidden md:block" />
-            <CtrlBtn icon={SkipBack} />
+            <CtrlBtn icon={SkipBack} onClick={onPrev} />
             <button
               onClick={onTogglePlay}
               disabled={!station || !!error}
@@ -99,7 +103,7 @@ export default function Player({ playerState, loading, error, onTogglePlay, onVo
                 : isPlaying ? <Pause size={16} fill="currentColor" />
                 : <Play size={16} fill="currentColor" className="ml-0.5" />}
             </button>
-            <CtrlBtn icon={SkipForward} />
+            <CtrlBtn icon={SkipForward} onClick={onNext} />
             <CtrlBtn icon={Repeat} className="hidden md:block" />
           </div>
 
@@ -143,9 +147,9 @@ export default function Player({ playerState, loading, error, onTogglePlay, onVo
   );
 }
 
-function CtrlBtn({ icon: Icon, className = '' }: { icon: React.ElementType; className?: string }) {
+function CtrlBtn({ icon: Icon, onClick, className = '' }: { icon: React.ElementType; onClick?: () => void; className?: string }) {
   return (
-    <button className={`transition-colors hover:text-white ${className}`} style={{ color: 'var(--sp-muted)' }}>
+    <button onClick={onClick} className={`transition-colors hover:text-white ${className}`} style={{ color: 'var(--sp-muted)' }}>
       <Icon size={16} />
     </button>
   );

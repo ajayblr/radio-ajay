@@ -1,4 +1,4 @@
-import { Search, X, Bell, User, Menu, Sun, Moon } from 'lucide-react';
+import { Search, X, Bell, User, Menu, Sun, Moon, Car } from 'lucide-react';
 
 interface Props {
   search: string;
@@ -6,9 +6,10 @@ interface Props {
   onOpenSidebar: () => void;
   dark: boolean;
   onToggleTheme: () => void;
+  onCarMode: () => void;
 }
 
-export default function Header({ search, onSearch, onOpenSidebar, dark, onToggleTheme }: Props) {
+export default function Header({ search, onSearch, onOpenSidebar, dark, onToggleTheme, onCarMode }: Props) {
   return (
     <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 py-3 sm:py-4 shrink-0"
       style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%)' }}>
@@ -46,6 +47,18 @@ export default function Header({ search, onSearch, onOpenSidebar, dark, onToggle
 
       {/* Right controls — hide less important ones on small screens */}
       <div className="flex items-center gap-1 sm:gap-2 ml-auto shrink-0">
+        {/* Car mode */}
+        <button
+          onClick={onCarMode}
+          title="Car mode"
+          className="hidden sm:flex w-8 h-8 rounded-full items-center justify-center transition-all hover:scale-105"
+          style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--sp-text)' }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.2)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+        >
+          <Car size={15} />
+        </button>
+
         {/* Theme toggle */}
         <button
           onClick={onToggleTheme}

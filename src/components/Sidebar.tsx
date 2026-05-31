@@ -1,4 +1,4 @@
-import { Heart, Clock, Globe, Music, Home, Search, Library, ChevronDown, Plus } from 'lucide-react';
+import { Heart, Clock, Globe, Music, Home, Library, ChevronDown, Plus } from 'lucide-react';
 import Logo from './Logo';
 import type { SidebarSection, Tab } from '../types';
 
@@ -10,13 +10,10 @@ interface Props {
   activeTab: Tab;
   onTab: (t: Tab) => void;
   countries: { name: string; stationcount: number }[];
-  states: { name: string; stationcount: number }[];
   genres: { name: string; stationcount: number }[];
   selectedCountry: string | null;
-  selectedState: string | null;
   selectedGenre: string | null;
   onCountry: (c: string) => void;
-  onState: (s: string) => void;
   onGenre: (g: string) => void;
 }
 
@@ -28,9 +25,9 @@ const browseItems = [
 export default function Sidebar({
   open, onClose,
   activeSection, onSection, activeTab, onTab,
-  countries, states, genres,
-  selectedCountry, selectedState, selectedGenre,
-  onCountry, onState, onGenre,
+  countries, genres,
+  selectedCountry, selectedGenre,
+  onCountry, onGenre,
 }: Props) {
   return (
     <>
@@ -53,7 +50,6 @@ export default function Sidebar({
             <Logo size={36} variant="full" />
           </div>
           <NavBtn icon={Home} label="Home" active={activeTab === 'all' && !activeSection} onClick={() => { onTab('all'); onClose(); }} />
-          <NavBtn icon={Search} label="Search" active={false} onClick={() => {}} />
         </div>
 
         {/* Library block */}

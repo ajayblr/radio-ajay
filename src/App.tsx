@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import StationGrid from './components/StationGrid';
 import Player from './components/Player';
 import BottomNav from './components/BottomNav';
+import CarView from './components/CarView';
 import { usePlayer } from './hooks/usePlayer';
 import { useFavorites } from './hooks/useFavorites';
 import { useRecent } from './hooks/useRecent';
@@ -14,7 +15,6 @@ import {
   getStats,
   getCountries,
   getTags,
-  getIndiaStates,
 } from './api/radioBrowser';
 import type { Station, Tab, SidebarSection } from './types';
 
@@ -29,12 +29,20 @@ function greeting() {
 
 export default function App() {
   const { dark, toggle: toggleTheme } = useTheme();
-  const { state: playerState, loading: playerLoading, error: playerError, play, togglePlay, setVolume, toggleMute } = usePlayer();
+  const { state: playerState, loading: playerLoading, error: playerError, play, togglePlay, setVolume, toggleMute, registerMediaSessionHandlers } = usePlayer();
   const { favorites, toggle: toggleFavorite, isFavorite } = useFavorites();
   const { recent, addRecent } = useRecent();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>('all');
+  const [carMode, setCarMode] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('radio_favorites') || '[]');
+      return saved.length > 0 ? 'favorites' : 'all';
+    } catch {
+      return 'all';
+    }
+  });
   const [activeSection, setActiveSection] = useState<SidebarSection | null>(null);
   const [search, setSearch] = useState('');
 
@@ -46,16 +54,13 @@ export default function App() {
   const offsetRef = useRef(0);
 
   const [countries, setCountries] = useState<{ name: string; stationcount: number }[]>([]);
-  const [states, setStates] = useState<{ name: string; stationcount: number }[]>([]);
   const [genres, setGenres] = useState<{ name: string; stationcount: number }[]>([]);
 
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
-  const [selectedState, setSelectedState] = useState<string | null>(null);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
 
   useEffect(() => {
     getCountries().then(setCountries).catch(() => {});
-    getIndiaStates().then(setStates).catch(() => {});
     getTags(80).then(setGenres).catch(() => {});
     getStats().then((s) => setTotalCount(s.stations)).catch(() => {});
   }, []);
@@ -63,9 +68,8 @@ export default function App() {
   const buildParams = useCallback(() => ({
     name: search.trim() || undefined,
     country: selectedCountry || undefined,
-    state: selectedState || undefined,
     tag: selectedGenre || undefined,
-  }), [search, selectedCountry, selectedState, selectedGenre]);
+  }), [search, selectedCountry, selectedGenre]);
 
   useEffect(() => {
     const params = buildParams();
@@ -75,7 +79,7 @@ export default function App() {
     setHasMore(true);
     setStationsLoading(true);
 
-    const isFiltered = params.name || params.country || params.state || params.tag;
+    const isFiltered = params.name || params.country || params.tag;
 
     const timer = setTimeout(async () => {
       if (JSON.stringify(buildParams()) !== filterKey) return;
@@ -96,13 +100,13 @@ export default function App() {
 
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, selectedCountry, selectedState, selectedGenre]);
+  }, [search, selectedCountry, selectedGenre]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || stationsLoading) return;
     setLoadingMore(true);
     const params = buildParams();
-    const isFiltered = params.name || params.country || params.state || params.tag;
+    const isFiltered = params.name || params.country || params.tag;
     const offset = offsetRef.current;
     try {
       const data = isFiltered
@@ -139,30 +143,25 @@ export default function App() {
     setActiveTab(tab);
     setActiveSection(null);
     setSelectedCountry(null);
-    setSelectedState(null);
+    
     setSelectedGenre(null);
     setSearch('');
   }, []);
 
   const handleCountry = useCallback((country: string) => {
-    setSelectedCountry(country); setSelectedState(null); setSelectedGenre(null);
-    setSearch(''); setActiveTab('all'); setActiveSection(null); setSidebarOpen(false);
-  }, []);
-
-  const handleState = useCallback((state: string) => {
-    setSelectedState(state); setSelectedCountry(null); setSelectedGenre(null);
+    setSelectedCountry(country); setSelectedGenre(null);
     setSearch(''); setActiveTab('all'); setActiveSection(null); setSidebarOpen(false);
   }, []);
 
   const handleGenre = useCallback((genre: string) => {
-    setSelectedGenre(genre); setSelectedCountry(null); setSelectedState(null);
+    setSelectedGenre(genre); setSelectedCountry(null); 
     setSearch(''); setActiveTab('all'); setActiveSection(null); setSidebarOpen(false);
   }, []);
 
   const handleSearch = useCallback((v: string) => {
     setSearch(v);
     if (v) {
-      setSelectedCountry(null); setSelectedState(null); setSelectedGenre(null);
+      setSelectedCountry(null); setSelectedGenre(null);
       setActiveTab('all'); setActiveSection(null);
     }
   }, []);
@@ -173,24 +172,54 @@ export default function App() {
     return stations;
   }, [activeTab, favorites, recent, stations]);
 
+  // Refs so next/prev callbacks stay stable and never re-render Player
+  const displayedStationsRef = useRef(displayedStations);
+  useEffect(() => { displayedStationsRef.current = displayedStations; }, [displayedStations]);
+  const currentStationRef = useRef(playerState.station);
+  useEffect(() => { currentStationRef.current = playerState.station; }, [playerState.station]);
+
+  const handleNext = useCallback(() => {
+    const list = displayedStationsRef.current;
+    const current = currentStationRef.current;
+    if (!current || !list.length) return;
+    const idx = list.findIndex(s => s.stationuuid === current.stationuuid);
+    const next = list[(idx + 1) % list.length];
+    play(next);
+    addRecent(next);
+  }, [play, addRecent]);
+
+  const handlePrev = useCallback(() => {
+    const list = displayedStationsRef.current;
+    const current = currentStationRef.current;
+    if (!current || !list.length) return;
+    const idx = list.findIndex(s => s.stationuuid === current.stationuuid);
+    const prev = list[(idx - 1 + list.length) % list.length];
+    play(prev);
+    addRecent(prev);
+  }, [play, addRecent]);
+
+  // Register next/prev with Media Session so steering-wheel buttons work
+  useEffect(() => {
+    registerMediaSessionHandlers(handleNext, handlePrev);
+  }, [registerMediaSessionHandlers, handleNext, handlePrev]);
+
   const gridTitle = useMemo(() => {
     if (activeTab === 'favorites') return 'Liked Stations';
     if (activeTab === 'recent') return 'Recently Played';
     if (search) return `Search results for "${search}"`;
     if (selectedCountry) return selectedCountry;
-    if (selectedState) return `${selectedState}, India`;
     if (selectedGenre) return selectedGenre.charAt(0).toUpperCase() + selectedGenre.slice(1);
     return greeting();
-  }, [activeTab, search, selectedCountry, selectedState, selectedGenre]);
+  }, [activeTab, search, selectedCountry, selectedGenre]);
 
   const isGridLoading = activeTab === 'all' && stationsLoading;
   const showHasMore = activeTab === 'all' ? hasMore : false;
   const showLoadingMore = activeTab === 'all' ? loadingMore : false;
-  const displayTotal = activeTab === 'all' && !search && !selectedCountry && !selectedState && !selectedGenre
+  const displayTotal = activeTab === 'all' && !search && !selectedCountry && !selectedGenre
     ? totalCount : undefined;
 
   // Derive a bg accent color for the top gradient from active station or section
-  const accentBg = selectedCountry || selectedState || selectedGenre
+  const accentBg = selectedCountry || selectedGenre
     ? '#1a3a2a'
     : activeTab === 'favorites'
     ? '#3a1a2a'
@@ -201,6 +230,23 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ background: 'var(--sp-bg)' }}>
+      {carMode && (
+        <CarView
+          playerState={playerState}
+          loading={playerLoading}
+          error={playerError}
+          stations={displayedStations}
+          isFavorite={isFavorite}
+          onPlay={handlePlay}
+          onTogglePlay={togglePlay}
+          onNext={handleNext}
+          onPrev={handlePrev}
+          onVolume={setVolume}
+          onToggleMute={toggleMute}
+          onFavorite={() => playerState.station && toggleFavorite(playerState.station)}
+          onExitCarMode={() => setCarMode(false)}
+        />
+      )}
       <div className="flex flex-1 min-h-0 gap-0 lg:gap-2 lg:p-2">
 
         <Sidebar
@@ -211,13 +257,10 @@ export default function App() {
           activeTab={activeTab}
           onTab={handleTab}
           countries={countries}
-          states={states}
           genres={genres}
           selectedCountry={selectedCountry}
-          selectedState={selectedState}
           selectedGenre={selectedGenre}
           onCountry={handleCountry}
-          onState={handleState}
           onGenre={handleGenre}
         />
 
@@ -235,6 +278,7 @@ export default function App() {
               onOpenSidebar={() => setSidebarOpen(true)}
               dark={dark}
               onToggleTheme={toggleTheme}
+              onCarMode={() => setCarMode(true)}
             />
 
             <div className="px-4 sm:px-6 pb-4 sm:pb-5">
@@ -264,7 +308,7 @@ export default function App() {
         </main>
       </div>
 
-      {/* Bottom nav — mobile only */}
+      {/* Bottom nav â€” mobile only */}
       <BottomNav
         activeTab={activeTab}
         onTab={handleTab}
@@ -278,6 +322,8 @@ export default function App() {
         loading={playerLoading}
         error={playerError}
         onTogglePlay={togglePlay}
+        onNext={handleNext}
+        onPrev={handlePrev}
         onVolume={setVolume}
         onToggleMute={toggleMute}
         isFavorite={playerState.station ? isFavorite(playerState.station.stationuuid) : false}
