@@ -54,7 +54,7 @@ export default function Sidebar({
 
         {/* Library block */}
         <div className="rounded-lg flex flex-col flex-1 overflow-hidden min-h-0" style={{ background: 'var(--sp-surface)' }}>
-          <div className="flex items-center justify-between px-4 pt-4 pb-2 shrink-0">
+          <div className={`flex items-center justify-between px-4 pt-4 pb-2 shrink-0 ${activeSection ? 'hidden lg:flex' : ''}`}>
             <button className="flex items-center gap-3 text-sm font-semibold hover:text-white transition-colors" style={{ color: 'var(--sp-muted)' }}>
               <Library size={22} />
               Your Library
@@ -64,8 +64,8 @@ export default function Sidebar({
             </button>
           </div>
 
-          {/* Fixed items — never scroll away */}
-          <div className="shrink-0 px-2 pt-0 pb-1 space-y-0.5">
+          {/* Fixed items — hidden on mobile when a browse section is open to maximise list space */}
+          <div className={`shrink-0 px-2 pt-0 pb-1 space-y-0.5 ${activeSection ? 'hidden lg:block' : ''}`}>
             <LibBtn icon={Heart} label="Favourite" sub="Playlist" active={activeTab === 'favorites'} onClick={() => { onTab('favorites'); onClose(); }} />
             <LibBtn icon={Clock} label="Recently Played" sub="Stations" active={activeTab === 'recent'} onClick={() => { onTab('recent'); onClose(); }} />
             <div className="h-px my-2" style={{ background: 'var(--sp-border)' }} />

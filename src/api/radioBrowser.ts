@@ -60,8 +60,23 @@ export async function getStations(params: { limit?: number; offset?: number } = 
   return apiFetch<Station[]>(`/stations?${query.toString()}`);
 }
 
+export interface GlobalStats {
+  stations: number;
+  stations_broken: number;
+  tags: number;
+  clicks_last_hour: number;
+  clicks_last_day: number;
+  languages: number;
+  countries: number;
+}
 export async function getStats(): Promise<{ stations: number }> {
   return apiFetch<{ stations: number }>('/stats');
+}
+export async function getGlobalStats(): Promise<GlobalStats> {
+  return apiFetch<GlobalStats>('/stats');
+}
+export async function getTopStations(limit = 10): Promise<Station[]> {
+  return apiFetch<Station[]>(`/stations/topclick?limit=${limit}&hidebroken=true`);
 }
 
 export async function getCountries(): Promise<{ name: string; stationcount: number }[]> {

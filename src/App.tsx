@@ -10,6 +10,11 @@ import { usePlayer } from './hooks/usePlayer';
 import { useFavorites } from './hooks/useFavorites';
 import { useRecent } from './hooks/useRecent';
 import { useTheme } from './hooks/useTheme';
+import { useCarEnvironment } from './hooks/useCarEnvironment';
+import { useNotifications } from './hooks/useNotifications';
+import { useAdmin } from './hooks/useAdmin';
+import AdminLogin from './components/AdminLogin';
+import AdminPanel from './components/AdminPanel';
 import {
   searchStations,
   getStations,
@@ -34,8 +39,15 @@ export default function App() {
   const { favorites, toggle: toggleFavorite, isFavorite } = useFavorites();
   const { recent, addRecent } = useRecent();
 
+  const { isCarEnvironment } = useCarEnvironment();
+  const { notifications, unreadCount, readIds, markAllRead } = useNotifications();
+  const { isAdmin, login, logout, loginError, loginLoading } = useAdmin();
+  const [showLogin,  setShowLogin]  = useState(false);
+  const [showAdmin,  setShowAdmin]  = useState(false);
+  const [carModeExited, setCarModeExited] = useState(false);
+  const carMode = isCarEnvironment && !carModeExited;
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [carMode, setCarMode] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('radio_favorites') || '[]');
@@ -248,7 +260,7 @@ export default function App() {
           onVolume={setVolume}
           onToggleMute={toggleMute}
           onFavorite={() => playerState.station && toggleFavorite(playerState.station)}
-          onExitCarMode={() => setCarMode(false)}
+          onExitCarMode={() => setCarModeExited(true)}
         />
       )}
       <div className="flex flex-1 min-h-0 gap-0 lg:gap-2 lg:p-2">
@@ -282,7 +294,12 @@ export default function App() {
               onOpenSidebar={() => setSidebarOpen(true)}
               dark={dark}
               onToggleTheme={toggleTheme}
-              onCarMode={() => setCarMode(true)}
+              notifications={notifications}
+              unreadCount={unreadCount}
+              readIds={readIds}
+              onMarkAllRead={markAllRead}
+              isAdmin={isAdmin}
+              onUserClick={() => isAdmin ? setShowAdmin(true) : setShowLogin(true)}
             />
 
             <div className="px-4 sm:px-6 pb-4 sm:pb-5">
@@ -345,6 +362,30 @@ export default function App() {
         search={search}
         onOpenSidebar={() => setSidebarOpen(true)}
       />
+
+      {/* Admin login modal */}
+      {showLogin && !isAdmin && (
+        <AdminLogin
+          onLogin={async (e, p) => {
+            const ok = await login(e, p);
+            if (ok) setShowLogin(false);
+          }}
+          error={loginError}
+          loading={loginLoading}
+          onClose={() => setShowLogin(false)}
+        />
+      )}
+
+      {/* Admin panel */}
+      {showAdmin && isAdmin && (
+        <AdminPanel
+          onClose={() => setShowAdmin(false)}
+          onLogout={() => { logout(); setShowAdmin(false); }}
+          favCount={favorites.length}
+          recentCount={recent.length}
+          notifications={notifications}
+        />
+      )}
 
       {/* Player */}
       <Player

@@ -1,0 +1,12 @@
+{
+  "notifications": [
+    {
+      "id": "v2-launch",
+      "type": "upgrade",
+      "title": "RadioAjay Updated",
+      "message": "New in this release: automatic CarPlay & Android Auto detection, vibrant new logo, improved mobile layout with full-height country/genre lists, always-visible favourite heart, and more.",
+      "date": "2026-06-01",
+      "version": "2.0"
+    }
+  ]
+}
