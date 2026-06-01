@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   X, LogOut, Radio, Globe, Heart, Bell, TrendingUp,
-  Activity, Users, Zap, RefreshCw, ShieldCheck,
+  Activity, Users, Zap, RefreshCw, ShieldCheck, Sun, Moon,
 } from 'lucide-react';
 import { getGlobalStats, getTopStations, getCountries, type GlobalStats } from '../api/radioBrowser';
 import { getAppStats, type AppStats } from '../lib/firebaseAnalytics';
@@ -9,16 +9,17 @@ import type { AppNotification } from '../hooks/useNotifications';
 import type { Station } from '../types';
 
 interface Props {
-  onClose:       () => void;
-  onLogout:      () => void;
-  favCount:      number;
-  recentCount:   number;
-  notifications: AppNotification[];
+  onClose:        () => void;
+  onLogout:       () => void;
+  favCount:       number;
+  notifications:  AppNotification[];
+  dark:           boolean;
+  onToggleTheme:  () => void;
 }
 
 const REFRESH_SECS = 30;
 
-export default function AdminPanel({ onClose, onLogout, favCount, notifications }: Props) {
+export default function AdminPanel({ onClose, onLogout, favCount, notifications, dark, onToggleTheme }: Props) {
   const [globalStats,  setGlobalStats]  = useState<GlobalStats  | null>(null);
   const [topStations,  setTopStations]  = useState<Station[]>([]);
   const [topCountries, setTopCountries] = useState<{ name: string; stationcount: number }[]>([]);
@@ -93,12 +94,26 @@ export default function AdminPanel({ onClose, onLogout, favCount, notifications 
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
+          {/* Theme toggle */}
+          <button
+            onClick={onToggleTheme}
+            title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-105"
+            style={{ background: 'var(--sp-elevated)', color: 'var(--sp-muted)' }}
+          >
+            {dark ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
+
+          {/* Logout — icon only on mobile/tablet, icon + label on desktop */}
           <button
             onClick={onLogout}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:opacity-90"
+            title="Logout"
+            className="flex items-center justify-center gap-1.5 rounded-lg transition-all hover:opacity-90
+                       w-8 h-8 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 text-xs font-medium"
             style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171' }}
           >
-            <LogOut size={13} /> Logout
+            <LogOut size={13} />
+            <span className="hidden sm:inline">Logout</span>
           </button>
           <button onClick={onClose}
             className="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover:text-white"

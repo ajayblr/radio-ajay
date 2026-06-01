@@ -391,8 +391,9 @@ export default function App() {
           onClose={() => setShowAdmin(false)}
           onLogout={() => { logout(); setShowAdmin(false); }}
           favCount={favorites.length}
-          recentCount={recent.length}
           notifications={notifications}
+          dark={dark}
+          onToggleTheme={toggleTheme}
         />
       )}
 
