@@ -70,7 +70,7 @@ export default function AdminPanel({ onClose, onLogout, favCount, notifications,
         <div className="flex items-center gap-2.5">
           <ShieldCheck size={20} style={{ color: '#a855f7' }} />
           <div>
-            <p className="text-sm font-bold text-white leading-none">Admin Panel</p>
+            <p className="text-sm font-bold leading-none" style={{ color: 'var(--sp-text)' }}>Admin Panel</p>
             <p className="text-[11px] mt-0.5" style={{ color: 'var(--sp-muted)' }}>
               blr.ajaykumar@gmail.com
             </p>
@@ -116,8 +116,8 @@ export default function AdminPanel({ onClose, onLogout, favCount, notifications,
             <span className="hidden sm:inline">Logout</span>
           </button>
           <button onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover:text-white"
-            style={{ color: 'var(--sp-muted)' }}>
+            className="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover:opacity-100 opacity-70"
+            style={{ color: 'var(--sp-text)' }}>
             <X size={16} />
           </button>
         </div>
@@ -156,13 +156,13 @@ export default function AdminPanel({ onClose, onLogout, favCount, notifications,
 
           {appStats?.configured === false ? (
             <div className="rounded-xl p-5" style={{ background: 'var(--sp-surface)', border: '1px solid var(--sp-border)' }}>
-              <p className="text-sm font-semibold text-white mb-1">Connect Firebase to enable app analytics</p>
+              <p className="text-sm font-semibold mb-1" style={{ color: 'var(--sp-text)' }}>Connect Firebase to enable app analytics</p>
               <p className="text-xs mb-3" style={{ color: 'var(--sp-muted)' }}>
                 Tracks real users playing RadioAjay — sessions, clicks, and countries across all devices.
               </p>
               <ol className="text-xs space-y-1.5 list-decimal list-inside" style={{ color: 'var(--sp-muted)' }}>
-                <li>Create a free project at <span className="text-white">console.firebase.google.com</span></li>
-                <li>Add a Realtime Database → Start in <strong className="text-white">test mode</strong></li>
+                <li>Create a free project at <span style={{ color: 'var(--sp-text)' }}>console.firebase.google.com</span></li>
+                <li>Add a Realtime Database → Start in <strong style={{ color: 'var(--sp-text)' }}>test mode</strong></li>
                 <li>Copy the database URL (e.g. <code className="px-1 py-0.5 rounded" style={{ background: 'var(--sp-elevated)' }}>https://your-app.firebaseio.com</code>)</li>
                 <li>Add <code className="px-1 py-0.5 rounded" style={{ background: 'var(--sp-elevated)' }}>VITE_FIREBASE_DB_URL=&lt;url&gt;</code> to Vercel env vars</li>
                 <li>Redeploy — stats appear here automatically</li>
@@ -187,7 +187,7 @@ export default function AdminPanel({ onClose, onLogout, favCount, notifications,
                     return (
                       <div key={c.country} className="flex items-center gap-3 px-4 py-2"
                         style={{ borderBottom: i < appStats!.topCountries.length - 1 ? '1px solid var(--sp-border)' : 'none' }}>
-                        <span className="flex-1 text-sm text-white">{c.country}</span>
+                        <span className="flex-1 text-sm" style={{ color: 'var(--sp-text)' }}>{c.country}</span>
                         <div className="w-24 sm:w-36 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--sp-elevated)' }}>
                           <div className="h-full rounded-full"
                             style={{ width: `${(c.count / max) * 100}%`, background: 'linear-gradient(90deg,#a855f7,#f97316)' }} />
@@ -209,7 +209,7 @@ export default function AdminPanel({ onClose, onLogout, favCount, notifications,
                     <div key={i} className="flex items-center gap-3 px-4 py-2.5"
                       style={{ borderBottom: i < appStats!.recentPlays.length - 1 ? '1px solid var(--sp-border)' : 'none' }}>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-white truncate">{p.name}</p>
+                        <p className="text-sm truncate" style={{ color: 'var(--sp-text)' }}>{p.name}</p>
                         <p className="text-[11px]" style={{ color: 'var(--sp-muted)' }}>{p.country}</p>
                       </div>
                       <span className="text-[11px] shrink-0" style={{ color: 'var(--sp-subtle)' }}>
@@ -324,7 +324,7 @@ export default function AdminPanel({ onClose, onLogout, favCount, notifications,
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white truncate leading-tight">{s.name}</p>
+                    <p className="text-sm truncate leading-tight" style={{ color: 'var(--sp-text)' }}>{s.name}</p>
                     <p className="text-[11px] truncate" style={{ color: 'var(--sp-muted)' }}>
                       {[s.country, s.codec, s.bitrate ? `${s.bitrate}kbps` : ''].filter(Boolean).join(' · ')}
                     </p>
@@ -360,7 +360,7 @@ export default function AdminPanel({ onClose, onLogout, favCount, notifications,
                     {n.type}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white leading-tight">
+                    <p className="text-sm font-medium leading-tight" style={{ color: 'var(--sp-text)' }}>
                       {n.title}{n.version && <span className="ml-1.5 text-[10px]" style={{ color: '#c084fc' }}>v{n.version}</span>}
                     </p>
                     <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--sp-muted)' }}>{n.message}</p>
@@ -398,7 +398,7 @@ function StatCard({ icon: Icon, label, value, color }: {
         style={{ background: `${color}22`, color }}>
         <Icon size={16} />
       </div>
-      <p className="text-2xl font-bold text-white leading-none">{value}</p>
+      <p className="text-2xl font-bold leading-none" style={{ color: 'var(--sp-text)' }}>{value}</p>
       <p className="text-xs" style={{ color: 'var(--sp-muted)' }}>{label}</p>
     </div>
   );
@@ -415,7 +415,7 @@ function ActivityCard({ icon: Icon, label, value, sub, color }: {
         <Icon size={18} />
       </div>
       <div>
-        <p className="text-xl font-bold text-white leading-none">{value}</p>
+        <p className="text-xl font-bold leading-none" style={{ color: 'var(--sp-text)' }}>{value}</p>
         <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--sp-text)' }}>{label}</p>
         <p className="text-[11px] mt-0.5" style={{ color: 'var(--sp-muted)' }}>{sub}</p>
       </div>
