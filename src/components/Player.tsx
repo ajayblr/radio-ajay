@@ -71,7 +71,7 @@ export default function Player({ playerState, loading, error, onTogglePlay, onNe
                   ? <img src={station.favicon} alt={station.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                   : <div className="w-full h-full flex items-center justify-center"><Radio size={20} style={{ color: 'var(--sp-muted)' }} /></div>}
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-white truncate">{station.name}</p>
                 <p className="text-xs truncate" style={{ color: 'var(--sp-muted)' }}>
                   {error

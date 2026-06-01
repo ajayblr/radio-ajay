@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { Search, X } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import StationGrid from './components/StationGrid';
@@ -204,13 +205,16 @@ export default function App() {
   }, [registerMediaSessionHandlers, handleNext, handlePrev]);
 
   const gridTitle = useMemo(() => {
-    if (activeTab === 'favorites') return 'Liked Stations';
+    if (activeTab === 'favorites') return 'Favourite';
     if (activeTab === 'recent') return 'Recently Played';
     if (search) return `Search results for "${search}"`;
     if (selectedCountry) return selectedCountry;
     if (selectedGenre) return selectedGenre.charAt(0).toUpperCase() + selectedGenre.slice(1);
     return greeting();
   }, [activeTab, search, selectedCountry, selectedGenre]);
+
+  // Show search input on mobile when in the all-stations view (keeps it visible while typing).
+  const showMobileSearch = activeTab === 'all' && !selectedCountry && !selectedGenre;
 
   const isGridLoading = activeTab === 'all' && stationsLoading;
   const showHasMore = activeTab === 'all' ? hasMore : false;
@@ -282,7 +286,33 @@ export default function App() {
             />
 
             <div className="px-4 sm:px-6 pb-4 sm:pb-5">
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">{gridTitle}</h1>
+              {/* Mobile: search input replaces the greeting; tabs like Favorites/Recent still show their title */}
+              {showMobileSearch ? (
+                <div className="relative sm:hidden mb-0">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--sp-subtle)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search stations..."
+                    value={search}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    className="w-full pl-9 pr-8 py-2.5 text-sm rounded-full focus:outline-none transition-all"
+                    style={{ background: 'var(--sp-elevated)', color: 'var(--sp-text)', border: '1px solid transparent' }}
+                    onFocus={(e) => { e.currentTarget.style.border = '1px solid white'; e.currentTarget.style.background = '#3e3e3e'; }}
+                    onBlur={(e) => { e.currentTarget.style.border = '1px solid transparent'; e.currentTarget.style.background = 'var(--sp-elevated)'; }}
+                  />
+                  {search && (
+                    <button onClick={() => handleSearch('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors hover:text-white"
+                      style={{ color: 'var(--sp-subtle)' }}>
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <h1 className="sm:hidden text-2xl font-bold text-white">{gridTitle}</h1>
+              )}
+              {/* sm+: always show title */}
+              <h1 className="hidden sm:block text-2xl sm:text-3xl font-bold text-white">{gridTitle}</h1>
               {displayTotal && (
                 <p className="text-sm mt-1" style={{ color: 'var(--sp-muted)' }}>
                   {displayTotal.toLocaleString()} stations available

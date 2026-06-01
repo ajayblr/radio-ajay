@@ -67,7 +67,7 @@ export default function StationCard({ station, isPlaying, isActive, isFavorite, 
         {/* Favorite */}
         <button
           onClick={(e) => { e.stopPropagation(); onFavorite(); }}
-          className="absolute top-2 right-2 p-1 rounded-full transition-all duration-150 opacity-0 group-hover:opacity-100"
+          className="absolute top-2 right-2 p-1 rounded-full transition-all duration-150"
           style={{ color: isFavorite ? 'var(--sp-green)' : 'white', background: 'rgba(0,0,0,0.4)' }}
           onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.1)')}
           onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
@@ -101,10 +101,10 @@ export default function StationCard({ station, isPlaying, isActive, isFavorite, 
       </div>
 
       {/* Text */}
-      <p className="text-sm font-semibold truncate mb-1" style={{ color: isActive ? 'var(--sp-green)' : 'var(--sp-text)' }}>
+      <p className="text-sm font-semibold line-clamp-2 leading-snug mb-1" style={{ color: isActive ? 'var(--sp-green)' : 'var(--sp-text)' }}>
         {station.name}
       </p>
-      <p className="text-xs truncate leading-relaxed capitalize" style={{ color: 'var(--sp-muted)' }}>
+      <p className="text-xs line-clamp-1 leading-relaxed capitalize" style={{ color: 'var(--sp-muted)' }}>
         {station.tags
           ? station.tags.split(',').slice(0, 2).map(t => t.trim()).filter(Boolean).join(', ')
           : station.country || 'Radio Station'}

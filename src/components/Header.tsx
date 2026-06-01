@@ -23,8 +23,8 @@ export default function Header({ search, onSearch, onOpenSidebar, dark, onToggle
         <Menu size={17} className="text-white" />
       </button>
 
-      {/* Search bar — grows to fill space on mobile */}
-      <div className="relative flex-1 sm:flex-none sm:w-72 md:w-80">
+      {/* Search bar — hidden on mobile (search lives in the gradient area there) */}
+      <div className="hidden sm:relative sm:block sm:flex-none sm:w-72 md:w-80">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--sp-subtle)' }} />
         <input
           type="text"
@@ -51,7 +51,7 @@ export default function Header({ search, onSearch, onOpenSidebar, dark, onToggle
         <button
           onClick={onCarMode}
           title="Car mode"
-          className="hidden sm:flex w-8 h-8 rounded-full items-center justify-center transition-all hover:scale-105"
+          className="flex w-8 h-8 rounded-full items-center justify-center transition-all hover:scale-105"
           style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--sp-text)' }}
           onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.2)')}
           onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
@@ -71,15 +71,12 @@ export default function Header({ search, onSearch, onOpenSidebar, dark, onToggle
           {dark ? <Sun size={15} /> : <Moon size={15} />}
         </button>
 
-        <button className="hidden md:block text-sm font-semibold px-3 py-1.5 rounded-full transition-colors whitespace-nowrap"
-          style={{ color: 'var(--sp-muted)' }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--sp-text)')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--sp-muted)')}>
-          Explore Premium
-        </button>
-        <button className="hidden sm:flex items-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-full border border-white/20 transition-colors hover:border-white"
-          style={{ color: 'var(--sp-text)' }}>
-          <Bell size={14} />
+<button className="flex w-8 h-8 rounded-full items-center justify-center transition-all hover:scale-105"
+          style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--sp-text)' }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.2)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+        >
+          <Bell size={15} />
         </button>
         <button className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all hover:scale-105"
           style={{ background: '#535353', color: 'var(--sp-text)' }}>

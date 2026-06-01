@@ -64,23 +64,26 @@ export default function Sidebar({
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5 min-h-0">
-            <LibBtn icon={Heart} label="Liked Stations" sub="Playlist" active={activeTab === 'favorites'} onClick={() => { onTab('favorites'); onClose(); }} />
-            <LibBtn icon={Clock} label="Recently Played" sub="Recently played" active={activeTab === 'recent'} onClick={() => { onTab('recent'); onClose(); }} />
-
+          {/* Fixed items — never scroll away */}
+          <div className="shrink-0 px-2 pt-0 pb-1 space-y-0.5">
+            <LibBtn icon={Heart} label="Favourite" sub="Playlist" active={activeTab === 'favorites'} onClick={() => { onTab('favorites'); onClose(); }} />
+            <LibBtn icon={Clock} label="Recently Played" sub="Stations" active={activeTab === 'recent'} onClick={() => { onTab('recent'); onClose(); }} />
             <div className="h-px my-2" style={{ background: 'var(--sp-border)' }} />
             <p className="text-xs font-bold uppercase tracking-widest px-2 py-1" style={{ color: 'var(--sp-subtle)' }}>Browse</p>
+          </div>
 
+          {/* Browse items — each section expands to fill remaining space when open */}
+          <div className="flex-1 flex flex-col overflow-hidden min-h-0 px-2 pb-2">
             {browseItems.map(({ id, icon: Icon, label }) => {
               const isOpen = activeSection === id;
               const isSelected =
                 (id === 'country' && selectedCountry) ||
                 (id === 'genre' && selectedGenre);
               return (
-                <div key={id}>
+                <div key={id} className={`flex flex-col min-h-0 ${isOpen ? 'flex-1 overflow-hidden' : 'shrink-0'}`}>
                   <button
                     onClick={() => onSection(id)}
-                    className="w-full flex items-center justify-between gap-3 px-2 py-2 rounded-md text-sm font-medium transition-colors"
+                    className="w-full flex items-center justify-between gap-3 px-2 py-2 rounded-md text-sm font-medium transition-colors shrink-0"
                     style={{ color: isOpen || isSelected ? 'var(--sp-text)' : 'var(--sp-muted)' }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--sp-elevated)')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
@@ -145,7 +148,7 @@ function SubList({ items, selected, onSelect, capitalize }: {
   capitalize?: boolean;
 }) {
   return (
-    <ul className="ml-4 mt-0.5 mb-1 max-h-44 overflow-y-auto space-y-0.5">
+    <ul className="ml-4 mt-0.5 mb-1 flex-1 overflow-y-auto min-h-0 space-y-0.5">
       {items.map((item) => (
         <li key={item.name}>
           <button
