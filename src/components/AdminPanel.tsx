@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   X, LogOut, Radio, Globe, Heart, Bell, TrendingUp,
   Activity, Users, Zap, RefreshCw, ShieldCheck,
 } from 'lucide-react';
 import { getGlobalStats, getTopStations, getCountries, type GlobalStats } from '../api/radioBrowser';
+import { getAppStats, type AppStats } from '../lib/firebaseAnalytics';
 import type { AppNotification } from '../hooks/useNotifications';
 import type { Station } from '../types';
 
@@ -15,28 +16,46 @@ interface Props {
   notifications: AppNotification[];
 }
 
-export default function AdminPanel({ onClose, onLogout, favCount, recentCount, notifications }: Props) {
+const REFRESH_SECS = 30;
+
+export default function AdminPanel({ onClose, onLogout, favCount, notifications }: Props) {
   const [globalStats,  setGlobalStats]  = useState<GlobalStats  | null>(null);
   const [topStations,  setTopStations]  = useState<Station[]>([]);
   const [topCountries, setTopCountries] = useState<{ name: string; stationcount: number }[]>([]);
+  const [appStats,     setAppStats]     = useState<AppStats | null>(null);
   const [loading,      setLoading]      = useState(true);
-  const [refreshedAt,  setRefreshedAt]  = useState(new Date());
+  const [refreshedAt,  setRefreshedAt]  = useState<Date | null>(null);
+  const [countdown,    setCountdown]    = useState(REFRESH_SECS);
+  const countdownRef = useRef(REFRESH_SECS);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
-    const [stats, stations, countries] = await Promise.allSettled([
+    const [stats, stations, countries, app] = await Promise.allSettled([
       getGlobalStats(),
       getTopStations(10),
       getCountries(),
+      getAppStats(),
     ]);
-    if (stats.status      === 'fulfilled') setGlobalStats(stats.value);
-    if (stations.status   === 'fulfilled') setTopStations(stations.value);
-    if (countries.status  === 'fulfilled') setTopCountries(countries.value.slice(0, 12));
+    if (stats.status     === 'fulfilled') setGlobalStats(stats.value);
+    if (stations.status  === 'fulfilled') setTopStations(stations.value);
+    if (countries.status === 'fulfilled') setTopCountries(countries.value.slice(0, 12));
+    if (app.status       === 'fulfilled') setAppStats(app.value);
     setRefreshedAt(new Date());
     setLoading(false);
-  }
+    countdownRef.current = REFRESH_SECS;
+    setCountdown(REFRESH_SECS);
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  // Initial load + tick every second; auto-refresh when countdown hits 0
+  useEffect(() => {
+    load();
+    const tick = setInterval(() => {
+      countdownRef.current -= 1;
+      setCountdown(countdownRef.current);
+      if (countdownRef.current <= 0) load();
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [load]);
 
   const maxStations = topCountries[0]?.stationcount ?? 1;
 
@@ -57,10 +76,18 @@ export default function AdminPanel({ onClose, onLogout, favCount, recentCount, n
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Live indicator + countdown */}
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+            style={{ background: 'var(--sp-elevated)' }}>
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#34d399' }} />
+            <span className="text-[11px] font-medium" style={{ color: 'var(--sp-muted)' }}>
+              {loading ? 'Updating…' : `Refreshes in ${countdown}s`}
+            </span>
+          </div>
           <button
             onClick={load}
             disabled={loading}
-            title="Refresh"
+            title="Refresh now"
             className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-105 disabled:opacity-40"
             style={{ background: 'var(--sp-elevated)', color: 'var(--sp-muted)' }}
           >
@@ -96,14 +123,101 @@ export default function AdminPanel({ onClose, onLogout, favCount, recentCount, n
           </div>
         </section>
 
+        {/* ── RadioAjay app activity ─────────────────────────── */}
+        <section>
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-xs font-bold uppercase tracking-widest"
+              style={{ color: 'var(--sp-muted)' }}>RadioAjay App Activity</h2>
+            {appStats?.configured ? (
+              <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399' }}>
+                <span className="w-1 h-1 rounded-full animate-pulse" style={{ background: '#34d399' }} /> LIVE
+              </span>
+            ) : (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                style={{ background: 'rgba(249,115,22,0.15)', color: '#fb923c' }}>SETUP NEEDED</span>
+            )}
+          </div>
+
+          {appStats?.configured === false ? (
+            <div className="rounded-xl p-5" style={{ background: 'var(--sp-surface)', border: '1px solid var(--sp-border)' }}>
+              <p className="text-sm font-semibold text-white mb-1">Connect Firebase to enable app analytics</p>
+              <p className="text-xs mb-3" style={{ color: 'var(--sp-muted)' }}>
+                Tracks real users playing RadioAjay — sessions, clicks, and countries across all devices.
+              </p>
+              <ol className="text-xs space-y-1.5 list-decimal list-inside" style={{ color: 'var(--sp-muted)' }}>
+                <li>Create a free project at <span className="text-white">console.firebase.google.com</span></li>
+                <li>Add a Realtime Database → Start in <strong className="text-white">test mode</strong></li>
+                <li>Copy the database URL (e.g. <code className="px-1 py-0.5 rounded" style={{ background: 'var(--sp-elevated)' }}>https://your-app.firebaseio.com</code>)</li>
+                <li>Add <code className="px-1 py-0.5 rounded" style={{ background: 'var(--sp-elevated)' }}>VITE_FIREBASE_DB_URL=&lt;url&gt;</code> to Vercel env vars</li>
+                <li>Redeploy — stats appear here automatically</li>
+              </ol>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+                <ActivityCard icon={Users}     label="Active users now"   value={appStats?.activeSessions ?? '—'} sub="Heartbeat last 2 min" color="#a855f7" />
+                <ActivityCard icon={Zap}       label="Plays last hour"    value={appStats?.clicksLastHour ?? '—'} sub="Via RadioAjay"        color="#f97316" />
+                <ActivityCard icon={TrendingUp} label="Plays last 24 h"   value={appStats?.clicksLast24h  ?? '—'} sub="Via RadioAjay"        color="#facc15" />
+              </div>
+
+              {/* Country breakdown */}
+              {(appStats?.topCountries?.length ?? 0) > 0 && (
+                <div className="rounded-xl overflow-hidden mb-3"
+                  style={{ background: 'var(--sp-surface)', border: '1px solid var(--sp-border)' }}>
+                  <p className="text-xs font-semibold px-4 py-2.5 border-b"
+                    style={{ color: 'var(--sp-muted)', borderColor: 'var(--sp-border)' }}>Plays by country (last 24 h)</p>
+                  {appStats!.topCountries.map((c, i) => {
+                    const max = appStats!.topCountries[0].count;
+                    return (
+                      <div key={c.country} className="flex items-center gap-3 px-4 py-2"
+                        style={{ borderBottom: i < appStats!.topCountries.length - 1 ? '1px solid var(--sp-border)' : 'none' }}>
+                        <span className="flex-1 text-sm text-white">{c.country}</span>
+                        <div className="w-24 sm:w-36 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--sp-elevated)' }}>
+                          <div className="h-full rounded-full"
+                            style={{ width: `${(c.count / max) * 100}%`, background: 'linear-gradient(90deg,#a855f7,#f97316)' }} />
+                        </div>
+                        <span className="w-8 text-right text-xs" style={{ color: 'var(--sp-muted)' }}>{c.count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Recent plays */}
+              {(appStats?.recentPlays?.length ?? 0) > 0 && (
+                <div className="rounded-xl overflow-hidden"
+                  style={{ background: 'var(--sp-surface)', border: '1px solid var(--sp-border)' }}>
+                  <p className="text-xs font-semibold px-4 py-2.5 border-b"
+                    style={{ color: 'var(--sp-muted)', borderColor: 'var(--sp-border)' }}>Recent plays</p>
+                  {appStats!.recentPlays.map((p, i) => (
+                    <div key={i} className="flex items-center gap-3 px-4 py-2.5"
+                      style={{ borderBottom: i < appStats!.recentPlays.length - 1 ? '1px solid var(--sp-border)' : 'none' }}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white truncate">{p.name}</p>
+                        <p className="text-[11px]" style={{ color: 'var(--sp-muted)' }}>{p.country}</p>
+                      </div>
+                      <span className="text-[11px] shrink-0" style={{ color: 'var(--sp-subtle)' }}>
+                        {new Date(p.ts).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </section>
+
         {/* ── Global activity ────────────────────────────────── */}
         <section>
-          <h2 className="text-xs font-bold uppercase tracking-widest mb-3"
-            style={{ color: 'var(--sp-muted)' }}>Global Listening Activity
-            <span className="ml-2 normal-case font-normal" style={{ color: 'var(--sp-subtle)' }}>
-              via Radio Browser API
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-xs font-bold uppercase tracking-widest"
+              style={{ color: 'var(--sp-muted)' }}>Global Listening Activity</h2>
+            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+              style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399' }}>
+              <span className="w-1 h-1 rounded-full animate-pulse" style={{ background: '#34d399' }} /> LIVE
             </span>
-          </h2>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <ActivityCard
               icon={Zap}
@@ -134,8 +248,14 @@ export default function AdminPanel({ onClose, onLogout, favCount, recentCount, n
 
         {/* ── Top countries ──────────────────────────────────── */}
         <section>
-          <h2 className="text-xs font-bold uppercase tracking-widest mb-3"
-            style={{ color: 'var(--sp-muted)' }}>Top Countries by Stations</h2>
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-xs font-bold uppercase tracking-widest"
+              style={{ color: 'var(--sp-muted)' }}>Top Countries by Stations</h2>
+            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+              style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399' }}>
+              <span className="w-1 h-1 rounded-full animate-pulse" style={{ background: '#34d399' }} /> LIVE
+            </span>
+          </div>
           <div className="rounded-xl overflow-hidden" style={{ background: 'var(--sp-surface)', border: '1px solid var(--sp-border)' }}>
             {topCountries.length === 0 ? (
               <Skeleton rows={6} />
@@ -163,8 +283,14 @@ export default function AdminPanel({ onClose, onLogout, favCount, recentCount, n
 
         {/* ── Top stations ───────────────────────────────────── */}
         <section>
-          <h2 className="text-xs font-bold uppercase tracking-widest mb-3"
-            style={{ color: 'var(--sp-muted)' }}>Top 10 Stations Globally</h2>
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-xs font-bold uppercase tracking-widest"
+              style={{ color: 'var(--sp-muted)' }}>Top 10 Stations Globally</h2>
+            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+              style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399' }}>
+              <span className="w-1 h-1 rounded-full animate-pulse" style={{ background: '#34d399' }} /> LIVE
+            </span>
+          </div>
           <div className="rounded-xl overflow-hidden" style={{ background: 'var(--sp-surface)', border: '1px solid var(--sp-border)' }}>
             {topStations.length === 0 ? (
               <Skeleton rows={10} />
@@ -238,7 +364,7 @@ export default function AdminPanel({ onClose, onLogout, favCount, recentCount, n
 
         {/* Footer */}
         <p className="text-[11px] text-center pb-2" style={{ color: 'var(--sp-subtle)' }}>
-          Data refreshed at {refreshedAt.toLocaleTimeString()} · RadioAjay Admin v2.0
+          {refreshedAt ? `Last updated ${refreshedAt.toLocaleTimeString()}` : 'Loading…'} · auto-refreshes every {REFRESH_SECS}s · RadioAjay Admin v2.0
         </p>
       </div>
     </div>

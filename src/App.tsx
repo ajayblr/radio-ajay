@@ -15,6 +15,7 @@ import { useNotifications } from './hooks/useNotifications';
 import { useAdmin } from './hooks/useAdmin';
 import AdminLogin from './components/AdminLogin';
 import AdminPanel from './components/AdminPanel';
+import { startSession, recordAppPlay } from './lib/firebaseAnalytics';
 import {
   searchStations,
   getStations,
@@ -142,6 +143,7 @@ export default function App() {
     } else {
       play(station);
       addRecent(station);
+      recordAppPlay(station);
     }
   }, [playerState.station, play, togglePlay, addRecent]);
 
@@ -215,6 +217,13 @@ export default function App() {
   useEffect(() => {
     registerMediaSessionHandlers(handleNext, handlePrev);
   }, [registerMediaSessionHandlers, handleNext, handlePrev]);
+
+  // Start anonymous session tracking (country heartbeat)
+  useEffect(() => {
+    let cleanup = () => {};
+    startSession().then(fn => { cleanup = fn; });
+    return () => cleanup();
+  }, []);
 
   const gridTitle = useMemo(() => {
     if (activeTab === 'favorites') return 'Favourite';
