@@ -28,11 +28,16 @@ export default function NotificationPanel({ notifications, readIds, onMarkAllRea
       {/* Backdrop */}
       <div className="fixed inset-0 z-40" onClick={onClose} />
 
-      {/* Panel */}
+      {/* Panel
+          Mobile:  fixed, full-width, anchored just below the header
+          Desktop: absolute dropdown below the bell button             */}
       <div
-        className="absolute right-0 top-10 z-50 rounded-xl shadow-2xl overflow-hidden"
+        className="
+          fixed inset-x-2 top-[3.75rem] z-50 rounded-xl shadow-2xl overflow-hidden flex flex-col
+          sm:absolute sm:inset-x-auto sm:right-0 sm:top-10 sm:w-[22rem]
+        "
         style={{
-          width: 'min(22rem, calc(100vw - 1rem))',
+          maxHeight: 'calc(100dvh - 5rem)',
           background: 'var(--sp-surface)',
           border: '1px solid var(--sp-border)',
         }}
@@ -40,26 +45,26 @@ export default function NotificationPanel({ notifications, readIds, onMarkAllRea
         {/* Header row */}
         <div className="flex items-center justify-between px-4 py-3 shrink-0"
           style={{ borderBottom: '1px solid var(--sp-border)' }}>
-          <span className="text-sm font-semibold text-white">Notifications</span>
+          <span className="text-sm font-semibold" style={{ color: 'var(--sp-text)' }}>Notifications</span>
           <div className="flex items-center gap-3">
             {hasUnread && (
               <button
                 onClick={onMarkAllRead}
-                className="flex items-center gap-1 text-xs transition-colors hover:text-white"
-                style={{ color: 'var(--sp-muted)' }}
+                className="flex items-center gap-1 text-xs transition-opacity hover:opacity-100 opacity-70"
+                style={{ color: 'var(--sp-text)' }}
               >
                 <CheckCheck size={12} /> Mark all read
               </button>
             )}
-            <button onClick={onClose} className="transition-colors hover:text-white"
-              style={{ color: 'var(--sp-muted)' }}>
+            <button onClick={onClose} className="transition-opacity hover:opacity-100 opacity-70"
+              style={{ color: 'var(--sp-text)' }}>
               <X size={15} />
             </button>
           </div>
         </div>
 
         {/* List */}
-        <div className="max-h-96 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto">
           {notifications.length === 0 ? (
             <p className="text-sm text-center py-10" style={{ color: 'var(--sp-muted)' }}>
               No notifications
@@ -89,7 +94,7 @@ export default function NotificationPanel({ notifications, readIds, onMarkAllRea
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm font-semibold leading-tight"
-                        style={{ color: unread ? 'white' : 'var(--sp-text)' }}>
+                        style={{ color: 'var(--sp-text)', fontWeight: unread ? 700 : 500 }}>
                         {n.title}
                         {n.version && (
                           <span
