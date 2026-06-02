@@ -13,6 +13,10 @@ function updateMediaSession(station: Station, isPlaying: boolean) {
       : [{ src: '/favicon.svg', sizes: '512x512', type: 'image/svg+xml' }],
   });
   navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  // Signal live stream so Chrome doesn't show ±10s seek buttons
+  try {
+    navigator.mediaSession.setPositionState({ duration: Infinity, playbackRate: 1, position: 0 });
+  } catch (_) {}
 }
 
 export function usePlayer() {
