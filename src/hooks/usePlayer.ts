@@ -13,10 +13,6 @@ function updateMediaSession(station: Station, isPlaying: boolean) {
       : [{ src: '/favicon.svg', sizes: '512x512', type: 'image/svg+xml' }],
   });
   navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-  // Signal live stream so Chrome doesn't show ±10s seek buttons
-  try {
-    navigator.mediaSession.setPositionState({ duration: Infinity, playbackRate: 1, position: 0 });
-  } catch (_) {}
 }
 
 export function usePlayer() {
@@ -42,9 +38,11 @@ export function usePlayer() {
       navigator.mediaSession.setActionHandler('pause', () => handlersRef.current.togglePlay());
       navigator.mediaSession.setActionHandler('nexttrack', () => handlersRef.current.next());
       navigator.mediaSession.setActionHandler('previoustrack', () => handlersRef.current.prev());
-      navigator.mediaSession.setActionHandler('seekbackward', null);
-      navigator.mediaSession.setActionHandler('seekforward', null);
-      navigator.mediaSession.setActionHandler('seekto', null);
+      // Chrome on Android ignores null for seek handlers on many versions and shows ±10s
+      // buttons based on the audio element's seekable range. Wire them to prev/next instead
+      // so the buttons are at least functional as station navigation.
+      navigator.mediaSession.setActionHandler('seekbackward', () => handlersRef.current.prev());
+      navigator.mediaSession.setActionHandler('seekforward', () => handlersRef.current.next());
     }
 
     return () => {
