@@ -38,6 +38,8 @@ export function usePlayer() {
       navigator.mediaSession.setActionHandler('pause', () => handlersRef.current.togglePlay());
       navigator.mediaSession.setActionHandler('nexttrack', () => handlersRef.current.next());
       navigator.mediaSession.setActionHandler('previoustrack', () => handlersRef.current.prev());
+      navigator.mediaSession.setActionHandler('seekbackward', null);
+      navigator.mediaSession.setActionHandler('seekforward', null);
     }
 
     return () => {
