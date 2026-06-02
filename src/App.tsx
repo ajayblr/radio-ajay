@@ -12,9 +12,6 @@ import { useRecent } from './hooks/useRecent';
 import { useTheme } from './hooks/useTheme';
 import { useCarEnvironment } from './hooks/useCarEnvironment';
 import { useNotifications } from './hooks/useNotifications';
-import { useAdmin } from './hooks/useAdmin';
-import AdminLogin from './components/AdminLogin';
-import AdminPanel from './components/AdminPanel';
 import { startSession, recordAppPlay } from './lib/firebaseAnalytics';
 import {
   searchStations,
@@ -42,9 +39,6 @@ export default function App() {
 
   const { isCarEnvironment } = useCarEnvironment();
   const { notifications, unreadCount, readIds, markAllRead } = useNotifications();
-  const { isAdmin, login, logout, loginError, loginLoading } = useAdmin();
-  const [showLogin,  setShowLogin]  = useState(false);
-  const [showAdmin,  setShowAdmin]  = useState(false);
   const [carModeExited, setCarModeExited] = useState(false);
   const carMode = isCarEnvironment && !carModeExited;
 
@@ -307,8 +301,6 @@ export default function App() {
               unreadCount={unreadCount}
               readIds={readIds}
               onMarkAllRead={markAllRead}
-              isAdmin={isAdmin}
-              onUserClick={() => isAdmin ? setShowAdmin(true) : setShowLogin(true)}
             />
 
             <div className="px-4 sm:px-6 pb-4 sm:pb-5">
@@ -371,31 +363,6 @@ export default function App() {
         search={search}
         onOpenSidebar={() => setSidebarOpen(true)}
       />
-
-      {/* Admin login modal */}
-      {showLogin && !isAdmin && (
-        <AdminLogin
-          onLogin={async (e, p) => {
-            const ok = await login(e, p);
-            if (ok) setShowLogin(false);
-          }}
-          error={loginError}
-          loading={loginLoading}
-          onClose={() => setShowLogin(false)}
-        />
-      )}
-
-      {/* Admin panel */}
-      {showAdmin && isAdmin && (
-        <AdminPanel
-          onClose={() => setShowAdmin(false)}
-          onLogout={() => { logout(); setShowAdmin(false); }}
-          favCount={favorites.length}
-          notifications={notifications}
-          dark={dark}
-          onToggleTheme={toggleTheme}
-        />
-      )}
 
       {/* Player */}
       <Player

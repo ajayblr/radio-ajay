@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, X, Bell, User, Menu, Sun, Moon } from 'lucide-react';
+import { Search, X, Bell, Menu, Sun, Moon } from 'lucide-react';
 import NotificationPanel from './NotificationPanel';
 import type { AppNotification } from '../hooks/useNotifications';
 
@@ -13,14 +13,11 @@ interface Props {
   unreadCount: number;
   readIds: Set<string>;
   onMarkAllRead: () => void;
-  isAdmin: boolean;
-  onUserClick: () => void;
 }
 
 export default function Header({
   search, onSearch, onOpenSidebar, dark, onToggleTheme,
   notifications, unreadCount, readIds, onMarkAllRead,
-  isAdmin, onUserClick,
 }: Props) {
   const [panelOpen, setPanelOpen] = useState(false);
 
@@ -115,19 +112,6 @@ export default function Header({
           )}
         </div>
 
-        {/* User / Admin button */}
-        <button
-          onClick={onUserClick}
-          title={isAdmin ? 'Open Admin Panel' : 'Admin Login'}
-          className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all hover:scale-105"
-          style={{
-            background: isAdmin ? 'linear-gradient(135deg,#a855f7,#6366f1)' : '#535353',
-            color: 'white',
-            boxShadow: isAdmin ? '0 0 10px rgba(168,85,247,0.5)' : 'none',
-          }}
-        >
-          <User size={16} />
-        </button>
       </div>
     </div>
   );
