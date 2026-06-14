@@ -218,6 +218,14 @@ export default function App() {
     logAnalyticsEvent(willBeFavorite ? 'set_favorite_country' : 'unset_favorite_country', { country });
   }, [favoriteCountry, toggleFavoriteCountry, handleCountry]);
 
+  // No favourite country set yet — open the sidebar's country list so one can be picked.
+  const handleBrowseCountries = useCallback(() => {
+    setSidebarOpen(true);
+    setActiveSection('country');
+    setActiveTab('all');
+    logAnalyticsEvent('screen_view', { firebase_screen: 'country' });
+  }, []);
+
   const handleGenre = useCallback((genre: string) => {
     setSelectedGenre(genre); setSelectedCountry(null);
     setSearch(''); setActiveTab('all'); setActiveSection(null); setSidebarOpen(false);
@@ -437,6 +445,7 @@ export default function App() {
         selectedCountry={selectedCountry}
         favoriteCountry={favoriteCountry}
         onSelectFavoriteCountry={() => favoriteCountry && handleCountry(favoriteCountry)}
+        onBrowseCountries={handleBrowseCountries}
         searchOpen={mobileSearchOpen}
         onToggleSearch={toggleMobileSearch}
       />

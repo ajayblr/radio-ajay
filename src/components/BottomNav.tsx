@@ -7,12 +7,13 @@ interface Props {
   selectedCountry: string | null;
   favoriteCountry: string | null;
   onSelectFavoriteCountry: () => void;
+  onBrowseCountries: () => void;
   searchOpen: boolean;
   onToggleSearch: () => void;
 }
 
 export default function BottomNav({
-  activeTab, onTab, selectedCountry, favoriteCountry, onSelectFavoriteCountry, searchOpen, onToggleSearch,
+  activeTab, onTab, selectedCountry, favoriteCountry, onSelectFavoriteCountry, onBrowseCountries, searchOpen, onToggleSearch,
 }: Props) {
   const homeActive = activeTab === 'all' && !selectedCountry && !searchOpen;
   const countryActive = activeTab === 'all' && !!favoriteCountry && selectedCountry === favoriteCountry;
@@ -22,9 +23,8 @@ export default function BottomNav({
       style={{ background: 'var(--sp-surface)', borderColor: 'var(--sp-border)' }}>
       <NavItem icon={Home} label="Home" active={homeActive} onClick={() => onTab('all')} fillWhenActive />
       <NavItem icon={Heart} label="Liked" active={activeTab === 'favorites'} onClick={() => onTab('favorites')} fillWhenActive />
-      {favoriteCountry && (
-        <NavItem icon={Globe} label={favoriteCountry} active={countryActive} onClick={onSelectFavoriteCountry} />
-      )}
+      <NavItem icon={Globe} label={favoriteCountry || 'Country'} active={countryActive}
+        onClick={favoriteCountry ? onSelectFavoriteCountry : onBrowseCountries} />
       <NavItem icon={searchOpen ? X : Search} label="Search" active={searchOpen} onClick={onToggleSearch} />
     </nav>
   );
