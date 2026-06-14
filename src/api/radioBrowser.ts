@@ -9,6 +9,7 @@ const SERVERS = [
 let activeServer = SERVERS[0];
 
 async function apiFetch<T>(path: string): Promise<T> {
+  let emptyFallback: T | undefined;
   for (const server of [activeServer, ...SERVERS.filter((s) => s !== activeServer)]) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6000);
@@ -18,14 +19,23 @@ async function apiFetch<T>(path: string): Promise<T> {
         signal: controller.signal,
       });
       if (!res.ok) continue;
+      const data = await res.json();
+      // A 200 with an empty array can mean this mirror hasn't synced the
+      // query's data yet — keep trying other servers for a real result,
+      // but remember it in case every server comes back empty.
+      if (Array.isArray(data) && data.length === 0) {
+        if (emptyFallback === undefined) emptyFallback = data as T;
+        continue;
+      }
       activeServer = server;
-      return res.json();
+      return data as T;
     } catch {
       // try next server
     } finally {
       clearTimeout(timeout);
     }
   }
+  if (emptyFallback !== undefined) return emptyFallback;
   throw new Error('All radio-browser servers unreachable');
 }
 
