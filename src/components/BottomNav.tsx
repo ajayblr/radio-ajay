@@ -1,43 +1,47 @@
-import { Home, Heart, Clock, Search } from 'lucide-react';
+import { Home, Heart, Globe, Search, X } from 'lucide-react';
 import type { Tab } from '../types';
 
 interface Props {
   activeTab: Tab;
   onTab: (t: Tab) => void;
-  search: string;
-  onOpenSidebar: () => void;
+  selectedCountry: string | null;
+  favoriteCountry: string | null;
+  onSelectFavoriteCountry: () => void;
+  searchOpen: boolean;
+  onToggleSearch: () => void;
 }
 
-const tabs = [
-  { id: 'all' as Tab, icon: Home, label: 'Home' },
-  { id: 'favorites' as Tab, icon: Heart, label: 'Liked' },
-  { id: 'recent' as Tab, icon: Clock, label: 'Recent' },
-];
+export default function BottomNav({
+  activeTab, onTab, selectedCountry, favoriteCountry, onSelectFavoriteCountry, searchOpen, onToggleSearch,
+}: Props) {
+  const homeActive = activeTab === 'all' && !selectedCountry && !searchOpen;
+  const countryActive = activeTab === 'all' && !!favoriteCountry && selectedCountry === favoriteCountry;
 
-export default function BottomNav({ activeTab, onTab, onOpenSidebar }: Props) {
   return (
     <nav className="sm:hidden flex items-center border-t shrink-0"
       style={{ background: 'var(--sp-surface)', borderColor: 'var(--sp-border)' }}>
-      {tabs.map(({ id, icon: Icon, label }) => (
-        <button
-          key={id}
-          onClick={() => onTab(id)}
-          className="flex-1 flex flex-col items-center gap-1 py-2.5 transition-colors"
-          style={{ color: activeTab === id ? 'var(--sp-text)' : 'var(--sp-subtle)' }}
-        >
-          <Icon size={20} fill={activeTab === id ? 'currentColor' : 'none'}
-            style={{ color: activeTab === id ? 'var(--sp-green)' : undefined }} />
-          <span className="text-[10px] font-medium">{label}</span>
-        </button>
-      ))}
-      <button
-        onClick={onOpenSidebar}
-        className="flex-1 flex flex-col items-center gap-1 py-2.5 transition-colors"
-        style={{ color: 'var(--sp-subtle)' }}
-      >
-        <Search size={20} />
-        <span className="text-[10px] font-medium">Browse</span>
-      </button>
+      <NavItem icon={Home} label="Home" active={homeActive} onClick={() => onTab('all')} fillWhenActive />
+      <NavItem icon={Heart} label="Liked" active={activeTab === 'favorites'} onClick={() => onTab('favorites')} fillWhenActive />
+      {favoriteCountry && (
+        <NavItem icon={Globe} label={favoriteCountry} active={countryActive} onClick={onSelectFavoriteCountry} />
+      )}
+      <NavItem icon={searchOpen ? X : Search} label="Search" active={searchOpen} onClick={onToggleSearch} />
     </nav>
+  );
+}
+
+function NavItem({ icon: Icon, label, active, onClick, fillWhenActive }: {
+  icon: React.ElementType; label: string; active: boolean; onClick: () => void; fillWhenActive?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex-1 flex flex-col items-center gap-1 py-2.5 px-1 min-w-0 transition-colors"
+      style={{ color: active ? 'var(--sp-text)' : 'var(--sp-subtle)' }}
+    >
+      <Icon size={20} fill={fillWhenActive && active ? 'currentColor' : 'none'}
+        style={{ color: active ? 'var(--sp-green)' : undefined }} />
+      <span className="text-[10px] font-medium truncate max-w-full">{label}</span>
+    </button>
   );
 }

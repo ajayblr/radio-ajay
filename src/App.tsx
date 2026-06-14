@@ -64,6 +64,7 @@ export default function App() {
   });
   const [activeSection, setActiveSection] = useState<SidebarSection | null>(null);
   const [search, setSearch] = useState('');
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   const [stations, setStations] = useState<Station[]>([]);
   const [stationsLoading, setStationsLoading] = useState(true);
@@ -185,12 +186,14 @@ export default function App() {
 
     setSelectedGenre(null);
     setSearch('');
+    setMobileSearchOpen(false);
     logAnalyticsEvent('screen_view', { firebase_screen: tab });
   }, []);
 
   const handleCountry = useCallback((country: string) => {
     setSelectedCountry(country); setSelectedGenre(null);
     setSearch(''); setActiveTab('all'); setActiveSection(null); setSidebarOpen(false);
+    setMobileSearchOpen(false);
     logAnalyticsEvent('screen_view', { firebase_screen: 'country', country });
   }, []);
 
@@ -204,6 +207,7 @@ export default function App() {
   const handleGenre = useCallback((genre: string) => {
     setSelectedGenre(genre); setSelectedCountry(null);
     setSearch(''); setActiveTab('all'); setActiveSection(null); setSidebarOpen(false);
+    setMobileSearchOpen(false);
     logAnalyticsEvent('screen_view', { firebase_screen: 'genre', genre });
   }, []);
 
@@ -214,6 +218,13 @@ export default function App() {
       setActiveTab('all'); setActiveSection(null);
     }
   }, []);
+
+  const toggleMobileSearch = useCallback(() => {
+    setMobileSearchOpen((open) => {
+      if (open) handleSearch('');
+      return !open;
+    });
+  }, [handleSearch]);
 
   const displayedStations = useMemo(() => {
     if (activeTab === 'favorites') return favorites;
@@ -267,9 +278,6 @@ export default function App() {
     if (selectedGenre) return selectedGenre.charAt(0).toUpperCase() + selectedGenre.slice(1);
     return geoCountry ? `${greeting()}, ${geoCountry}` : greeting();
   }, [activeTab, search, selectedCountry, selectedGenre, geoCountry]);
-
-  // Show search input on mobile when in the all-stations view (keeps it visible while typing).
-  const showMobileSearch = activeTab === 'all' && !selectedCountry && !selectedGenre;
 
   const isGridLoading = activeTab === 'all' && stationsLoading;
   const showHasMore = activeTab === 'all' ? hasMore : false;
@@ -354,25 +362,13 @@ export default function App() {
             />
 
             <div className="px-4 sm:px-6 pb-4 sm:pb-5">
-              {/* Mobile: search input replaces the greeting; tabs like Favorites/Recent still show their title */}
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">
-                {gridTitle}
-                {displayTotal && (
-                  <span className="sm:hidden ml-2 text-sm font-semibold align-middle" style={{ color: 'var(--sp-muted)' }}>
-                    ({displayTotal.toLocaleString()})
-                  </span>
-                )}
-              </h1>
-              {displayTotal && (
-                <p className="hidden sm:block text-sm mt-1" style={{ color: 'var(--sp-muted)' }}>
-                  {displayTotal.toLocaleString()} stations available
-                </p>
-              )}
-              {showMobileSearch && (
-                <div className="relative sm:hidden mt-3">
+              {/* Mobile: tapping Search in the bottom nav shows this input above the greeting/title */}
+              {mobileSearchOpen && (
+                <div className="relative sm:hidden mb-3">
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--sp-subtle)' }} />
                   <input
                     type="text"
+                    autoFocus
                     placeholder="Search stations..."
                     value={search}
                     onChange={(e) => handleSearch(e.target.value)}
@@ -389,6 +385,12 @@ export default function App() {
                     </button>
                   )}
                 </div>
+              )}
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">{gridTitle}</h1>
+              {displayTotal && (
+                <p className="text-sm mt-1" style={{ color: 'var(--sp-muted)' }}>
+                  {displayTotal.toLocaleString()} stations available
+                </p>
               )}
             </div>
           </div>
@@ -415,8 +417,11 @@ export default function App() {
       <BottomNav
         activeTab={activeTab}
         onTab={handleTab}
-        search={search}
-        onOpenSidebar={() => setSidebarOpen(true)}
+        selectedCountry={selectedCountry}
+        favoriteCountry={favoriteCountry}
+        onSelectFavoriteCountry={() => favoriteCountry && handleCountry(favoriteCountry)}
+        searchOpen={mobileSearchOpen}
+        onToggleSearch={toggleMobileSearch}
       />
 
       {/* Player */}
