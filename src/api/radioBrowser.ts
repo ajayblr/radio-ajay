@@ -2,14 +2,14 @@ import type { Station } from '../types';
 
 const SERVERS = [
   'https://de1.api.radio-browser.info',
-  'https://nl1.api.radio-browser.info',
-  'https://at1.api.radio-browser.info',
+  'https://de2.api.radio-browser.info',
+  'https://all.api.radio-browser.info',
 ];
 
 let activeServer = SERVERS[0];
 
-async function apiFetch<T>(path: string): Promise<T> {
-  let emptyFallback: T | undefined;
+async function tryServers<T>(path: string): Promise<{ data: T; empty: boolean } | null> {
+  let emptyResult: T | undefined;
   for (const server of [activeServer, ...SERVERS.filter((s) => s !== activeServer)]) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6000);
@@ -24,18 +24,34 @@ async function apiFetch<T>(path: string): Promise<T> {
       // query's data yet — keep trying other servers for a real result,
       // but remember it in case every server comes back empty.
       if (Array.isArray(data) && data.length === 0) {
-        if (emptyFallback === undefined) emptyFallback = data as T;
+        if (emptyResult === undefined) emptyResult = data as T;
         continue;
       }
       activeServer = server;
-      return data as T;
+      return { data: data as T, empty: false };
     } catch {
       // try next server
     } finally {
       clearTimeout(timeout);
     }
   }
-  if (emptyFallback !== undefined) return emptyFallback;
+  return emptyResult !== undefined ? { data: emptyResult, empty: true } : null;
+}
+
+// The radio-browser mirror network occasionally has brief, network-wide
+// hiccups where every server returns nothing. Retry a couple of times with
+// backoff before giving up, rather than failing the whole page load.
+async function apiFetch<T>(path: string): Promise<T> {
+  let lastEmpty: T | undefined;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const result = await tryServers<T>(path);
+    if (result) {
+      if (!result.empty) return result.data;
+      lastEmpty = result.data;
+    }
+    if (attempt < 2) await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+  }
+  if (lastEmpty !== undefined) return lastEmpty;
   throw new Error('All radio-browser servers unreachable');
 }
 

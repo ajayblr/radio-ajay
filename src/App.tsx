@@ -26,16 +26,6 @@ import type { Station, Tab, SidebarSection } from './types';
 
 const PAGE_SIZE = 100;
 
-// First load is often a cold start for the radio-browser API — retry once on
-// failure or an empty result before giving up and showing "No stations found".
-async function fetchWithRetry(fn: () => Promise<Station[]>): Promise<Station[]> {
-  try {
-    const data = await fn();
-    if (data.length > 0) return data;
-  } catch { /* fall through to retry */ }
-  return fn();
-}
-
 function greeting() {
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';
@@ -115,11 +105,9 @@ export default function App() {
     const timer = setTimeout(async () => {
       if (JSON.stringify(buildParams()) !== filterKey) return;
       try {
-        const data = await fetchWithRetry(() =>
-          isFiltered
-            ? searchStations({ ...params, limit: PAGE_SIZE, offset: 0 })
-            : getStations({ limit: PAGE_SIZE, offset: 0 })
-        );
+        const data = isFiltered
+          ? await searchStations({ ...params, limit: PAGE_SIZE, offset: 0 })
+          : await getStations({ limit: PAGE_SIZE, offset: 0 });
         if (JSON.stringify(buildParams()) !== filterKey) return;
         setStations(data);
         offsetRef.current = data.length;
