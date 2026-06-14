@@ -355,8 +355,14 @@ export default function App() {
 
             <div className="px-4 sm:px-6 pb-4 sm:pb-5">
               {/* Mobile: search input replaces the greeting; tabs like Favorites/Recent still show their title */}
-              {showMobileSearch ? (
-                <div className="relative sm:hidden mb-0">
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">{gridTitle}</h1>
+              {displayTotal && (
+                <p className="text-sm mt-1" style={{ color: 'var(--sp-muted)' }}>
+                  {displayTotal.toLocaleString()} stations available
+                </p>
+              )}
+              {showMobileSearch && (
+                <div className="relative sm:hidden mt-3">
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--sp-subtle)' }} />
                   <input
                     type="text"
@@ -376,15 +382,6 @@ export default function App() {
                     </button>
                   )}
                 </div>
-              ) : (
-                <h1 className="sm:hidden text-2xl font-bold text-white">{gridTitle}</h1>
-              )}
-              {/* sm+: always show title */}
-              <h1 className="hidden sm:block text-2xl sm:text-3xl font-bold text-white">{gridTitle}</h1>
-              {displayTotal && (
-                <p className="text-sm mt-1" style={{ color: 'var(--sp-muted)' }}>
-                  {displayTotal.toLocaleString()} stations available
-                </p>
               )}
             </div>
           </div>
