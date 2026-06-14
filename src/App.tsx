@@ -355,9 +355,16 @@ export default function App() {
 
             <div className="px-4 sm:px-6 pb-4 sm:pb-5">
               {/* Mobile: search input replaces the greeting; tabs like Favorites/Recent still show their title */}
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">{gridTitle}</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">
+                {gridTitle}
+                {displayTotal && (
+                  <span className="sm:hidden ml-2 text-sm font-semibold align-middle" style={{ color: 'var(--sp-muted)' }}>
+                    ({displayTotal.toLocaleString()})
+                  </span>
+                )}
+              </h1>
               {displayTotal && (
-                <p className="text-sm mt-1" style={{ color: 'var(--sp-muted)' }}>
+                <p className="hidden sm:block text-sm mt-1" style={{ color: 'var(--sp-muted)' }}>
                   {displayTotal.toLocaleString()} stations available
                 </p>
               )}
