@@ -177,7 +177,7 @@ function SubList({ items, selected, onSelect, capitalize, favorite, onToggleFavo
             <button
               onClick={() => onToggleFavorite(item.name)}
               title={favorite === item.name ? 'Remove as default country' : 'Set as default country'}
-              className={`p-1.5 mr-1 rounded-md transition-opacity ${favorite === item.name ? '' : 'opacity-0 group-hover:opacity-100'}`}
+              className={`p-2 mr-1 rounded-md transition-opacity ${favorite === item.name ? 'opacity-100' : 'opacity-40 group-hover:opacity-100'}`}
               style={{ color: favorite === item.name ? 'var(--sp-green)' : 'var(--sp-muted)' }}
             >
               <Star size={13} fill={favorite === item.name ? 'currentColor' : 'none'} />
