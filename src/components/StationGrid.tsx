@@ -16,11 +16,12 @@ interface Props {
   onFavorite: (s: Station) => void;
   title?: string;
   totalCount?: number;
+  onRetry?: () => void;
 }
 
 export default function StationGrid({
   stations, loading, loadingMore, hasMore, onLoadMore,
-  activeStation, isPlaying, isFavorite, onPlay, onFavorite, title, totalCount,
+  activeStation, isPlaying, isFavorite, onPlay, onFavorite, title, totalCount, onRetry,
 }: Props) {
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -56,6 +57,15 @@ export default function StationGrid({
           <p className="font-semibold text-white mb-1">No stations found</p>
           <p className="text-sm" style={{ color: 'var(--sp-muted)' }}>Try a different search or filter</p>
         </div>
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            className="px-4 py-1.5 text-xs font-semibold rounded-full transition-opacity hover:opacity-90"
+            style={{ background: 'var(--sp-green)', color: '#000' }}
+          >
+            Try again
+          </button>
+        )}
       </div>
     );
   }

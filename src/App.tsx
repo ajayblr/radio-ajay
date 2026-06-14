@@ -55,7 +55,7 @@ export default function App() {
   };
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // Default view: favourite country > favourite stations > India
+  // Default view: favourite country > favourite stations > all stations
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     if (getFavoriteCountry()) return 'all';
     return hasFavorites() ? 'favorites' : 'all';
@@ -73,18 +73,17 @@ export default function App() {
   const [countries, setCountries] = useState<{ name: string; stationcount: number }[]>([]);
   const [genres, setGenres] = useState<{ name: string; stationcount: number }[]>([]);
 
-  const [selectedCountry, setSelectedCountry] = useState<string | null>(() => {
-    const fav = getFavoriteCountry();
-    if (fav) return fav;
-    return hasFavorites() ? null : 'India';
-  });
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(() => getFavoriteCountry());
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
+
+  const [reloadNonce, setReloadNonce] = useState(0);
+  const retry = useCallback(() => setReloadNonce((n) => n + 1), []);
 
   useEffect(() => {
     getCountries().then(setCountries).catch(() => {});
     getTags(80).then(setGenres).catch(() => {});
     getStats().then((s) => setTotalCount(s.stations)).catch(() => {});
-  }, []);
+  }, [reloadNonce]);
 
   const buildParams = useCallback(() => ({
     name: search.trim() || undefined,
@@ -122,7 +121,7 @@ export default function App() {
 
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, selectedCountry, selectedGenre]);
+  }, [search, selectedCountry, selectedGenre, reloadNonce]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || stationsLoading) return;
@@ -393,6 +392,7 @@ export default function App() {
             onPlay={handlePlay}
             onFavorite={handleFavorite}
             totalCount={displayTotal}
+            onRetry={retry}
           />
         </main>
       </div>
