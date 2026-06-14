@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Search, X, Bell, Menu, Sun, Moon } from 'lucide-react';
+import { Search, X, Bell, Menu, Sun, Moon, Mail } from 'lucide-react';
 import NotificationPanel from './NotificationPanel';
+import ContactModal from './ContactModal';
 import type { AppNotification } from '../hooks/useNotifications';
+import { logAnalyticsEvent } from '../lib/firebase';
 
 interface Props {
   search: string;
@@ -20,6 +22,7 @@ export default function Header({
   notifications, unreadCount, readIds, onMarkAllRead,
 }: Props) {
   const [panelOpen, setPanelOpen] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
 
   function openPanel() {
     setPanelOpen(true);
@@ -75,6 +78,20 @@ export default function Header({
         >
           {dark ? <Sun size={15} /> : <Moon size={15} />}
         </button>
+
+        {/* Contact / feedback */}
+        <button
+          onClick={() => { setContactOpen(true); logAnalyticsEvent('contact_click'); }}
+          title="Send feedback or get in touch"
+          className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-105"
+          style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--sp-text)' }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.2)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+        >
+          <Mail size={15} />
+        </button>
+
+        {contactOpen && <ContactModal onClose={() => setContactOpen(false)} />}
 
         {/* Bell — highlights when unread notifications exist */}
         <div className="relative">

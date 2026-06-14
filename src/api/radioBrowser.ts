@@ -10,15 +10,20 @@ let activeServer = SERVERS[0];
 
 async function apiFetch<T>(path: string): Promise<T> {
   for (const server of [activeServer, ...SERVERS.filter((s) => s !== activeServer)]) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
     try {
       const res = await fetch(`${server}/json${path}`, {
         headers: { 'User-Agent': 'RadioAjay/1.0' },
+        signal: controller.signal,
       });
       if (!res.ok) continue;
       activeServer = server;
       return res.json();
     } catch {
       // try next server
+    } finally {
+      clearTimeout(timeout);
     }
   }
   throw new Error('All radio-browser servers unreachable');

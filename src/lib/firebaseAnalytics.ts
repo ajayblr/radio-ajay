@@ -73,6 +73,21 @@ export function recordAppPlay(station: { stationuuid: string; name: string; coun
   });
 }
 
+/* ── Feedback / contact form ───────────────────────────────── */
+
+export async function submitFeedback(data: { name?: string; email?: string; message: string }): Promise<boolean> {
+  if (!DB) return false;
+  try {
+    const r = await fetch(`${DB}/feedback.json`, {
+      method: 'POST',
+      body: JSON.stringify({ ...data, ts: Date.now(), sid: sid() }),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
 /* ── Stats queries (admin only) ────────────────────────────── */
 
 export interface AppStats {

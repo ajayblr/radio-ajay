@@ -1,6 +1,14 @@
 {
   "notifications": [
     {
+      "id": "favourite-country",
+      "type": "info",
+      "title": "Set a Favourite Country",
+      "message": "Open By Country in the sidebar and tap the star next to any country to make it your default. RadioAjay will load that country's stations every time you open the app.",
+      "date": "2026-06-14",
+      "version": "2.1"
+    },
+    {
       "id": "v2-launch",
       "type": "upgrade",
       "title": "RadioAjay Updated",

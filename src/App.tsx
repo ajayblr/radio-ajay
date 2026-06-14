@@ -8,11 +8,13 @@ import BottomNav from './components/BottomNav';
 import CarView from './components/CarView';
 import { usePlayer } from './hooks/usePlayer';
 import { useFavorites } from './hooks/useFavorites';
+import { useFavoriteCountry, getFavoriteCountry } from './hooks/useFavoriteCountry';
 import { useRecent } from './hooks/useRecent';
 import { useTheme } from './hooks/useTheme';
 import { useCarEnvironment } from './hooks/useCarEnvironment';
 import { useNotifications } from './hooks/useNotifications';
 import { startSession, recordAppPlay } from './lib/firebaseAnalytics';
+import { logAnalyticsEvent } from './lib/firebase';
 import {
   searchStations,
   getStations,
@@ -23,6 +25,16 @@ import {
 import type { Station, Tab, SidebarSection } from './types';
 
 const PAGE_SIZE = 100;
+
+// First load is often a cold start for the radio-browser API — retry once on
+// failure or an empty result before giving up and showing "No stations found".
+async function fetchWithRetry(fn: () => Promise<Station[]>): Promise<Station[]> {
+  try {
+    const data = await fn();
+    if (data.length > 0) return data;
+  } catch { /* fall through to retry */ }
+  return fn();
+}
 
 function greeting() {
   const h = new Date().getHours();
@@ -35,6 +47,7 @@ export default function App() {
   const { dark, toggle: toggleTheme } = useTheme();
   const { state: playerState, loading: playerLoading, error: playerError, play, togglePlay, setVolume, toggleMute, registerMediaSessionHandlers } = usePlayer();
   const { favorites, toggle: toggleFavorite, isFavorite } = useFavorites();
+  const { favoriteCountry, toggle: toggleFavoriteCountry } = useFavoriteCountry();
   const { recent, addRecent } = useRecent();
 
   const { isCarEnvironment } = useCarEnvironment();
@@ -42,14 +55,20 @@ export default function App() {
   const [carModeExited, setCarModeExited] = useState(false);
   const carMode = isCarEnvironment && !carModeExited;
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>(() => {
+  const hasFavorites = () => {
     try {
       const saved = JSON.parse(localStorage.getItem('radio_favorites') || '[]');
-      return saved.length > 0 ? 'favorites' : 'all';
+      return saved.length > 0;
     } catch {
-      return 'all';
+      return false;
     }
+  };
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Default view: favourite country > favourite stations > India
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    if (getFavoriteCountry()) return 'all';
+    return hasFavorites() ? 'favorites' : 'all';
   });
   const [activeSection, setActiveSection] = useState<SidebarSection | null>(null);
   const [search, setSearch] = useState('');
@@ -64,7 +83,11 @@ export default function App() {
   const [countries, setCountries] = useState<{ name: string; stationcount: number }[]>([]);
   const [genres, setGenres] = useState<{ name: string; stationcount: number }[]>([]);
 
-  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(() => {
+    const fav = getFavoriteCountry();
+    if (fav) return fav;
+    return hasFavorites() ? null : 'India';
+  });
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
 
   useEffect(() => {
@@ -92,9 +115,12 @@ export default function App() {
     const timer = setTimeout(async () => {
       if (JSON.stringify(buildParams()) !== filterKey) return;
       try {
-        const data = isFiltered
-          ? await searchStations({ ...params, limit: PAGE_SIZE, offset: 0 })
-          : await getStations({ limit: PAGE_SIZE, offset: 0 });
+        const data = await fetchWithRetry(() =>
+          isFiltered
+            ? searchStations({ ...params, limit: PAGE_SIZE, offset: 0 })
+            : getStations({ limit: PAGE_SIZE, offset: 0 })
+        );
+        if (JSON.stringify(buildParams()) !== filterKey) return;
         setStations(data);
         offsetRef.current = data.length;
         setHasMore(data.length === PAGE_SIZE);
@@ -138,33 +164,58 @@ export default function App() {
       play(station);
       addRecent(station);
       recordAppPlay(station);
+      logAnalyticsEvent('play_station', {
+        station_name: station.name,
+        country: station.country,
+        genre: station.tags,
+      });
     }
   }, [playerState.station, play, togglePlay, addRecent]);
+
+  const handleFavorite = useCallback((station: Station) => {
+    const willBeFavorite = !isFavorite(station.stationuuid);
+    toggleFavorite(station);
+    logAnalyticsEvent(willBeFavorite ? 'add_to_favorites' : 'remove_from_favorites', {
+      station_name: station.name,
+      country: station.country,
+    });
+  }, [toggleFavorite, isFavorite]);
 
   const handleSection = useCallback((section: SidebarSection) => {
     setActiveSection((prev) => prev === section ? null : section);
     if (section === 'favorites') { setActiveTab('all'); }
     else if (section === 'recent') { setActiveTab('all'); }
     else setActiveTab('all');
+    logAnalyticsEvent('screen_view', { firebase_screen: section });
   }, []);
 
   const handleTab = useCallback((tab: Tab) => {
     setActiveTab(tab);
     setActiveSection(null);
     setSelectedCountry(null);
-    
+
     setSelectedGenre(null);
     setSearch('');
+    logAnalyticsEvent('screen_view', { firebase_screen: tab });
   }, []);
 
   const handleCountry = useCallback((country: string) => {
     setSelectedCountry(country); setSelectedGenre(null);
     setSearch(''); setActiveTab('all'); setActiveSection(null); setSidebarOpen(false);
+    logAnalyticsEvent('screen_view', { firebase_screen: 'country', country });
   }, []);
 
+  const handleToggleFavoriteCountry = useCallback((country: string) => {
+    const willBeFavorite = favoriteCountry !== country;
+    toggleFavoriteCountry(country);
+    if (willBeFavorite) handleCountry(country);
+    logAnalyticsEvent(willBeFavorite ? 'set_favorite_country' : 'unset_favorite_country', { country });
+  }, [favoriteCountry, toggleFavoriteCountry, handleCountry]);
+
   const handleGenre = useCallback((genre: string) => {
-    setSelectedGenre(genre); setSelectedCountry(null); 
+    setSelectedGenre(genre); setSelectedCountry(null);
     setSearch(''); setActiveTab('all'); setActiveSection(null); setSidebarOpen(false);
+    logAnalyticsEvent('screen_view', { firebase_screen: 'genre', genre });
   }, []);
 
   const handleSearch = useCallback((v: string) => {
@@ -262,7 +313,7 @@ export default function App() {
           onPrev={handlePrev}
           onVolume={setVolume}
           onToggleMute={toggleMute}
-          onFavorite={() => playerState.station && toggleFavorite(playerState.station)}
+          onFavorite={() => playerState.station && handleFavorite(playerState.station)}
           onExitCarMode={() => setCarModeExited(true)}
         />
       )}
@@ -281,6 +332,8 @@ export default function App() {
           selectedGenre={selectedGenre}
           onCountry={handleCountry}
           onGenre={handleGenre}
+          favoriteCountry={favoriteCountry}
+          onToggleFavoriteCountry={handleToggleFavoriteCountry}
         />
 
         {/* Main content */}
@@ -350,7 +403,7 @@ export default function App() {
             isPlaying={playerState.isPlaying}
             isFavorite={isFavorite}
             onPlay={handlePlay}
-            onFavorite={toggleFavorite}
+            onFavorite={handleFavorite}
             totalCount={displayTotal}
           />
         </main>
@@ -375,7 +428,7 @@ export default function App() {
         onVolume={setVolume}
         onToggleMute={toggleMute}
         isFavorite={playerState.station ? isFavorite(playerState.station.stationuuid) : false}
-        onFavorite={() => playerState.station && toggleFavorite(playerState.station)}
+        onFavorite={() => playerState.station && handleFavorite(playerState.station)}
       />
     </div>
   );

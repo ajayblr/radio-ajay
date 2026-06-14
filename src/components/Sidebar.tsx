@@ -1,4 +1,4 @@
-import { Heart, Clock, Globe, Music, Home, Library, ChevronDown, Plus } from 'lucide-react';
+import { Heart, Clock, Globe, Music, Home, Library, ChevronDown, Plus, Star } from 'lucide-react';
 import Logo from './Logo';
 import type { SidebarSection, Tab } from '../types';
 
@@ -15,6 +15,8 @@ interface Props {
   selectedGenre: string | null;
   onCountry: (c: string) => void;
   onGenre: (g: string) => void;
+  favoriteCountry: string | null;
+  onToggleFavoriteCountry: (c: string) => void;
 }
 
 const browseItems = [
@@ -28,6 +30,7 @@ export default function Sidebar({
   countries, genres,
   selectedCountry, selectedGenre,
   onCountry, onGenre,
+  favoriteCountry, onToggleFavoriteCountry,
 }: Props) {
   return (
     <>
@@ -91,7 +94,15 @@ export default function Sidebar({
                     <span className="flex items-center gap-3"><Icon size={16} />{label}</span>
                     <ChevronDown size={14} className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} style={{ color: 'var(--sp-subtle)' }} />
                   </button>
-                  {isOpen && id === 'country' && <SubList items={countries} selected={selectedCountry} onSelect={onCountry} />}
+                  {isOpen && id === 'country' && (
+                    <SubList
+                      items={countries}
+                      selected={selectedCountry}
+                      onSelect={onCountry}
+                      favorite={favoriteCountry}
+                      onToggleFavorite={onToggleFavoriteCountry}
+                    />
+                  )}
                   {isOpen && id === 'genre' && <SubList items={genres} selected={selectedGenre} onSelect={onGenre} capitalize />}
                 </div>
               );
@@ -141,25 +152,37 @@ function LibBtn({ icon: Icon, label, sub, active, onClick }: {
   );
 }
 
-function SubList({ items, selected, onSelect, capitalize }: {
+function SubList({ items, selected, onSelect, capitalize, favorite, onToggleFavorite }: {
   items: { name: string; stationcount: number }[];
   selected: string | null;
   onSelect: (v: string) => void;
   capitalize?: boolean;
+  favorite?: string | null;
+  onToggleFavorite?: (v: string) => void;
 }) {
   return (
     <ul className="ml-4 mt-0.5 mb-1 flex-1 overflow-y-auto min-h-0 space-y-0.5">
       {items.map((item) => (
-        <li key={item.name}>
+        <li key={item.name} className="flex items-center group">
           <button
             onClick={() => onSelect(item.name)}
-            className={`w-full text-left text-xs px-3 py-1.5 rounded-md transition-colors ${capitalize ? 'capitalize' : ''}`}
+            className={`flex-1 text-left text-xs px-3 py-1.5 rounded-md transition-colors ${capitalize ? 'capitalize' : ''}`}
             style={{ color: selected === item.name ? 'var(--sp-green)' : 'var(--sp-muted)', fontWeight: selected === item.name ? 600 : 400 }}
             onMouseEnter={(e) => { if (selected !== item.name) e.currentTarget.style.color = 'var(--sp-text)'; }}
             onMouseLeave={(e) => { if (selected !== item.name) e.currentTarget.style.color = 'var(--sp-muted)'; }}
           >
             {item.name}<span className="ml-1 opacity-40">({item.stationcount})</span>
           </button>
+          {onToggleFavorite && (
+            <button
+              onClick={() => onToggleFavorite(item.name)}
+              title={favorite === item.name ? 'Remove as default country' : 'Set as default country'}
+              className={`p-1.5 mr-1 rounded-md transition-opacity ${favorite === item.name ? '' : 'opacity-0 group-hover:opacity-100'}`}
+              style={{ color: favorite === item.name ? 'var(--sp-green)' : 'var(--sp-muted)' }}
+            >
+              <Star size={13} fill={favorite === item.name ? 'currentColor' : 'none'} />
+            </button>
+          )}
         </li>
       ))}
     </ul>
