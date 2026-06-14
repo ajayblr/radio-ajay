@@ -381,7 +381,7 @@ export default function App() {
             <div className="px-4 sm:px-6 pb-4 sm:pb-5">
               {/* Mobile: tapping Search in the bottom nav shows this input above the greeting/title */}
               {mobileSearchOpen && (
-                <div className="relative sm:hidden mb-3">
+                <div className="relative lg:hidden mb-3">
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--sp-subtle)' }} />
                   <input
                     type="text"

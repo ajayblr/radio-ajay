@@ -18,7 +18,7 @@ export default function BottomNav({
   const countryActive = activeTab === 'all' && !!favoriteCountry && selectedCountry === favoriteCountry;
 
   return (
-    <nav className="sm:hidden flex items-center border-t shrink-0"
+    <nav className="lg:hidden flex items-center border-t shrink-0"
       style={{ background: 'var(--sp-surface)', borderColor: 'var(--sp-border)' }}>
       <NavItem icon={Home} label="Home" active={homeActive} onClick={() => onTab('all')} fillWhenActive />
       <NavItem icon={Heart} label="Liked" active={activeTab === 'favorites'} onClick={() => onTab('favorites')} fillWhenActive />

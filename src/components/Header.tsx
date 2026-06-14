@@ -42,8 +42,8 @@ export default function Header({
         <Menu size={17} className="text-white" />
       </button>
 
-      {/* Search bar — hidden on mobile (search lives in the gradient area there) */}
-      <div className="hidden sm:relative sm:block sm:flex-none sm:w-72 md:w-80">
+      {/* Search bar — hidden on mobile/tablet (search lives in the gradient area there) */}
+      <div className="hidden lg:relative lg:block lg:flex-none lg:w-72 xl:w-80">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--sp-subtle)' }} />
         <input
           type="text"
