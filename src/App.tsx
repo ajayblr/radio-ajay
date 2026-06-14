@@ -13,6 +13,7 @@ import { useRecent } from './hooks/useRecent';
 import { useTheme } from './hooks/useTheme';
 import { useCarEnvironment } from './hooks/useCarEnvironment';
 import { useNotifications } from './hooks/useNotifications';
+import { useGeoCountry } from './hooks/useGeoCountry';
 import { startSession, recordAppPlay } from './lib/firebaseAnalytics';
 import { logAnalyticsEvent } from './lib/firebase';
 import {
@@ -42,6 +43,7 @@ export default function App() {
 
   const { isCarEnvironment } = useCarEnvironment();
   const { notifications, unreadCount, readIds, markAllRead } = useNotifications();
+  const geoCountry = useGeoCountry();
   const [carModeExited, setCarModeExited] = useState(false);
   const carMode = isCarEnvironment && !carModeExited;
 
@@ -263,8 +265,8 @@ export default function App() {
     if (search) return `Search results for "${search}"`;
     if (selectedCountry) return selectedCountry;
     if (selectedGenre) return selectedGenre.charAt(0).toUpperCase() + selectedGenre.slice(1);
-    return greeting();
-  }, [activeTab, search, selectedCountry, selectedGenre]);
+    return geoCountry ? `${greeting()}, ${geoCountry}` : greeting();
+  }, [activeTab, search, selectedCountry, selectedGenre, geoCountry]);
 
   // Show search input on mobile when in the all-stations view (keeps it visible while typing).
   const showMobileSearch = activeTab === 'all' && !selectedCountry && !selectedGenre;
@@ -272,8 +274,16 @@ export default function App() {
   const isGridLoading = activeTab === 'all' && stationsLoading;
   const showHasMore = activeTab === 'all' ? hasMore : false;
   const showLoadingMore = activeTab === 'all' ? loadingMore : false;
-  const displayTotal = activeTab === 'all' && !search && !selectedCountry && !selectedGenre
-    ? totalCount : undefined;
+
+  // Stations-available count for whatever is currently displayed.
+  const displayTotal = useMemo(() => {
+    if (activeTab === 'favorites') return favorites.length || undefined;
+    if (activeTab === 'recent') return recent.length || undefined;
+    if (search) return stations.length || undefined;
+    if (selectedCountry) return countries.find((c) => c.name === selectedCountry)?.stationcount;
+    if (selectedGenre) return genres.find((g) => g.name === selectedGenre)?.stationcount;
+    return totalCount;
+  }, [activeTab, search, selectedCountry, selectedGenre, favorites.length, recent.length, stations.length, countries, genres, totalCount]);
 
   // Derive a bg accent color for the top gradient from active station or section
   const accentBg = selectedCountry || selectedGenre
