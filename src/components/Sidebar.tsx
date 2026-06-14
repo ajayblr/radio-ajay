@@ -1,4 +1,4 @@
-import { Heart, Clock, Globe, Music, Home, Library, ChevronDown, Plus, Star } from 'lucide-react';
+import { Heart, Clock, Globe, Music, Home, Library, ChevronDown, Plus, Star, TrendingUp } from 'lucide-react';
 import Logo from './Logo';
 import type { SidebarSection, Tab } from '../types';
 
@@ -107,6 +107,18 @@ export default function Sidebar({
                 </div>
               );
             })}
+
+            {/* Top 20 — direct shortcut, no sub-list to expand */}
+            <button
+              onClick={() => { onTab('top'); onClose(); }}
+              className={`shrink-0 w-full flex items-center gap-3 px-2 py-2 rounded-md text-sm font-medium transition-colors ${activeSection ? 'hidden lg:flex' : ''}`}
+              style={{ color: activeTab === 'top' ? 'var(--sp-green)' : 'var(--sp-muted)' }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--sp-elevated)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              <TrendingUp size={16} />
+              Top 20
+            </button>
           </div>
         </div>
       </aside>

@@ -22,6 +22,7 @@ import {
   getStats,
   getCountries,
   getTags,
+  getTopStations,
 } from './api/radioBrowser';
 import type { Station, Tab, SidebarSection } from './types';
 
@@ -79,6 +80,9 @@ export default function App() {
   const [selectedCountry, setSelectedCountry] = useState<string | null>(() => getFavoriteCountry());
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
 
+  const [topStations, setTopStations] = useState<Station[]>([]);
+  const [topLoading, setTopLoading] = useState(false);
+
   const [reloadNonce, setReloadNonce] = useState(0);
   const retry = useCallback(() => setReloadNonce((n) => n + 1), []);
 
@@ -87,6 +91,16 @@ export default function App() {
     getTags(80).then(setGenres).catch(() => {});
     getStats().then((s) => setTotalCount(s.stations)).catch(() => {});
   }, [reloadNonce]);
+
+  // Fetch the top-played stations once, the first time that tab is opened.
+  useEffect(() => {
+    if (activeTab !== 'top' || topStations.length > 0) return;
+    setTopLoading(true);
+    getTopStations(20)
+      .then(setTopStations)
+      .catch(() => setTopStations([]))
+      .finally(() => setTopLoading(false));
+  }, [activeTab, topStations.length]);
 
   const buildParams = useCallback(() => ({
     name: search.trim() || undefined,
@@ -229,8 +243,9 @@ export default function App() {
   const displayedStations = useMemo(() => {
     if (activeTab === 'favorites') return favorites;
     if (activeTab === 'recent') return recent;
+    if (activeTab === 'top') return topStations;
     return stations;
-  }, [activeTab, favorites, recent, stations]);
+  }, [activeTab, favorites, recent, topStations, stations]);
 
   // Refs so next/prev callbacks stay stable and never re-render Player
   const displayedStationsRef = useRef(displayedStations);
@@ -273,13 +288,14 @@ export default function App() {
   const gridTitle = useMemo(() => {
     if (activeTab === 'favorites') return 'Favourite';
     if (activeTab === 'recent') return 'Recently Played';
+    if (activeTab === 'top') return 'Top 20';
     if (search) return `Search results for "${search}"`;
     if (selectedCountry) return selectedCountry;
     if (selectedGenre) return selectedGenre.charAt(0).toUpperCase() + selectedGenre.slice(1);
     return geoCountry ? `${greeting()}, ${geoCountry}` : greeting();
   }, [activeTab, search, selectedCountry, selectedGenre, geoCountry]);
 
-  const isGridLoading = activeTab === 'all' && stationsLoading;
+  const isGridLoading = (activeTab === 'all' && stationsLoading) || (activeTab === 'top' && topLoading);
   const showHasMore = activeTab === 'all' ? hasMore : false;
   const showLoadingMore = activeTab === 'all' ? loadingMore : false;
 
@@ -287,11 +303,12 @@ export default function App() {
   const displayTotal = useMemo(() => {
     if (activeTab === 'favorites') return favorites.length || undefined;
     if (activeTab === 'recent') return recent.length || undefined;
+    if (activeTab === 'top') return topStations.length || undefined;
     if (search) return stations.length || undefined;
     if (selectedCountry) return countries.find((c) => c.name === selectedCountry)?.stationcount;
     if (selectedGenre) return genres.find((g) => g.name === selectedGenre)?.stationcount;
     return totalCount;
-  }, [activeTab, search, selectedCountry, selectedGenre, favorites.length, recent.length, stations.length, countries, genres, totalCount]);
+  }, [activeTab, search, selectedCountry, selectedGenre, favorites.length, recent.length, topStations.length, stations.length, countries, genres, totalCount]);
 
   // Derive a bg accent color for the top gradient from active station or section
   const accentBg = selectedCountry || selectedGenre

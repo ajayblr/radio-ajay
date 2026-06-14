@@ -15,7 +15,7 @@ export interface Station {
   clickcount: number;
 }
 
-export type Tab = 'all' | 'favorites' | 'recent';
+export type Tab = 'all' | 'favorites' | 'recent' | 'top';
 
 export type SidebarSection = 'favorites' | 'recent' | 'country' | 'state' | 'genre';
 
