@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Android signing — never commit these
+*.keystore
+*.jks
