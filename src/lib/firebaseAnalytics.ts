@@ -35,10 +35,20 @@ export async function dbGet<T>(path: string): Promise<T | null> {
 
 let heartbeat: ReturnType<typeof setInterval> | null = null;
 
+const GEO_SESSION_KEY = 'radio_geo_country';
+
 async function getCountry(): Promise<string> {
   try {
+    const cached = sessionStorage.getItem(GEO_SESSION_KEY);
+    if (cached) return cached;
+  } catch { /* ignore */ }
+  try {
     const r = await fetch('https://ipapi.co/country_name/');
-    if (r.ok) return (await r.text()).trim();
+    if (r.ok) {
+      const name = (await r.text()).trim();
+      try { sessionStorage.setItem(GEO_SESSION_KEY, name); } catch {}
+      return name;
+    }
   } catch { /* ignore */ }
   return 'Unknown';
 }

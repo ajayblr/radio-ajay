@@ -8,6 +8,28 @@ const SERVERS = [
 
 let activeServer = SERVERS[0];
 
+// localStorage cache for slow-changing data so subsequent visits load instantly
+const CACHE_TTL_MS = {
+  countries: 24 * 60 * 60 * 1000,  // 24 h — country list barely changes
+  tags:      24 * 60 * 60 * 1000,  // 24 h
+  stats:      5 * 60 * 1000,        // 5 min
+  stations:  15 * 60 * 1000,        // 15 min for the default first-page
+};
+
+function lsGet<T>(key: string, ttlMs: number): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw) as { ts: number; data: T };
+    if (Date.now() - ts > ttlMs) return null;
+    return data;
+  } catch { return null; }
+}
+
+function lsSet(key: string, data: unknown): void {
+  try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch {}
+}
+
 async function tryServers<T>(path: string): Promise<{ data: T; empty: boolean } | null> {
   let emptyResult: T | undefined;
   for (const server of [activeServer, ...SERVERS.filter((s) => s !== activeServer)]) {
@@ -82,13 +104,23 @@ export async function searchStations(params: SearchParams): Promise<Station[]> {
 }
 
 export async function getStations(params: { limit?: number; offset?: number } = {}): Promise<Station[]> {
+  const limit = params.limit ?? 100;
+  const offset = params.offset ?? 0;
   const query = new URLSearchParams();
-  query.set('limit', String(params.limit ?? 100));
-  query.set('offset', String(params.offset ?? 0));
+  query.set('limit', String(limit));
+  query.set('offset', String(offset));
   query.set('order', 'votes');
   query.set('reverse', 'true');
   query.set('hidebroken', 'true');
-  return apiFetch<Station[]>(`/stations?${query.toString()}`);
+  // Cache only the unfiltered first page — it's the most expensive call on slow connections
+  const cacheKey = `radio_stations_p0`;
+  if (offset === 0) {
+    const cached = lsGet<Station[]>(cacheKey, CACHE_TTL_MS.stations);
+    if (cached) return cached;
+  }
+  const data = await apiFetch<Station[]>(`/stations?${query.toString()}`);
+  if (offset === 0 && data.length > 0) lsSet(cacheKey, data);
+  return data;
 }
 
 export interface GlobalStats {
@@ -101,7 +133,11 @@ export interface GlobalStats {
   countries: number;
 }
 export async function getStats(): Promise<{ stations: number }> {
-  return apiFetch<{ stations: number }>('/stats');
+  const cached = lsGet<{ stations: number }>('radio_stats', CACHE_TTL_MS.stats);
+  if (cached) return cached;
+  const data = await apiFetch<{ stations: number }>('/stats');
+  lsSet('radio_stats', data);
+  return data;
 }
 export async function getGlobalStats(): Promise<GlobalStats> {
   return apiFetch<GlobalStats>('/stats');
@@ -111,15 +147,24 @@ export async function getTopStations(limit = 10): Promise<Station[]> {
 }
 
 export async function getCountries(): Promise<{ name: string; stationcount: number }[]> {
+  const cached = lsGet<{ name: string; stationcount: number }[]>('radio_countries', CACHE_TTL_MS.countries);
+  if (cached) return cached;
   const data = await apiFetch<{ name: string; stationcount: number }[]>('/countries?order=stationcount&reverse=true');
-  return data.filter((c) => c.name && c.stationcount > 0);
+  const filtered = data.filter((c) => c.name && c.stationcount > 0);
+  if (filtered.length > 0) lsSet('radio_countries', filtered);
+  return filtered;
 }
 
 export async function getTags(limit = 80): Promise<{ name: string; stationcount: number }[]> {
+  const cacheKey = `radio_tags_${limit}`;
+  const cached = lsGet<{ name: string; stationcount: number }[]>(cacheKey, CACHE_TTL_MS.tags);
+  if (cached) return cached;
   const data = await apiFetch<{ name: string; stationcount: number }[]>(
     `/tags?order=stationcount&reverse=true&limit=${limit}`
   );
-  return data.filter((t) => t.name && t.stationcount > 10);
+  const filtered = data.filter((t) => t.name && t.stationcount > 10);
+  if (filtered.length > 0) lsSet(cacheKey, filtered);
+  return filtered;
 }
 
 export async function getIndiaStates(): Promise<{ name: string; stationcount: number }[]> {

@@ -45,6 +45,7 @@ export default function StationCard({ station, isPlaying, isActive, isFavorite, 
             <img
               src={station.favicon}
               alt={station.name}
+              loading="lazy"
               className="card-img w-full h-full object-cover"
               onError={(e) => {
                 const img = e.target as HTMLImageElement;
