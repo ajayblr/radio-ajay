@@ -10,11 +10,22 @@ import android.content.Intent;
 import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
-import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.IBinder;
-import android.os.PowerManager;
+import androidx.annotation.OptIn;
 import androidx.core.app.NotificationCompat;
+import androidx.media3.common.AudioAttributes.Builder;
+import androidx.media3.common.C;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.PlaybackException;
+import androidx.media3.common.Player;
+import androidx.media3.common.util.UnstableApi;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
+import androidx.media3.datasource.okhttp.OkHttpDataSource;
+import okhttp3.OkHttpClient;
+
+import java.util.concurrent.TimeUnit;
 
 public class RadioService extends Service {
     public static final String ACTION_PLAY = "ACTION_PLAY";
@@ -27,43 +38,33 @@ public class RadioService extends Service {
     private static final String CHANNEL_ID = "radio_playback";
     private static final int NOTIFICATION_ID = 1;
 
-    private MediaPlayer mediaPlayer;
+    private ExoPlayer player;
     private String currentStationName = "RadioAjay";
-    private PowerManager.WakeLock wakeLock;
     private AudioManager audioManager;
     private AudioFocusRequest audioFocusRequest;
     private boolean hasAudioFocus = false;
 
     private final AudioManager.OnAudioFocusChangeListener audioFocusListener = focusChange -> {
+        if (player == null) return;
         switch (focusChange) {
             case AudioManager.AUDIOFOCUS_GAIN:
                 hasAudioFocus = true;
-                if (mediaPlayer != null) {
-                    try {
-                        if (!mediaPlayer.isPlaying()) mediaPlayer.start();
-                        mediaPlayer.setVolume(1.0f, 1.0f);
-                    } catch (Exception ignored) {}
-                }
+                player.setVolume(1.0f);
+                player.setPlayWhenReady(true);
                 break;
             case AudioManager.AUDIOFOCUS_LOSS:
-                // Permanent loss — another app took over; stop cleanly
                 hasAudioFocus = false;
                 releasePlayer();
                 abandonAudioFocus();
-                releaseWakeLock();
                 stopForeground(true);
                 stopSelf();
                 break;
             case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
                 hasAudioFocus = false;
-                if (mediaPlayer != null) {
-                    try { if (mediaPlayer.isPlaying()) mediaPlayer.pause(); } catch (Exception ignored) {}
-                }
+                player.setPlayWhenReady(false);
                 break;
             case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
-                if (mediaPlayer != null) {
-                    try { mediaPlayer.setVolume(0.3f, 0.3f); } catch (Exception ignored) {}
-                }
+                player.setVolume(0.3f);
                 break;
         }
     };
@@ -89,20 +90,15 @@ public class RadioService extends Service {
                 startPlayback(url);
                 break;
             case ACTION_PAUSE:
-                if (mediaPlayer != null) {
-                    try { if (mediaPlayer.isPlaying()) mediaPlayer.pause(); } catch (Exception ignored) {}
-                }
+                if (player != null) player.setPlayWhenReady(false);
                 abandonAudioFocus();
                 break;
             case ACTION_RESUME:
-                if (requestAudioFocus() && mediaPlayer != null) {
-                    try { if (!mediaPlayer.isPlaying()) mediaPlayer.start(); } catch (Exception ignored) {}
-                }
+                if (requestAudioFocus() && player != null) player.setPlayWhenReady(true);
                 break;
             case ACTION_STOP:
                 releasePlayer();
                 abandonAudioFocus();
-                releaseWakeLock();
                 stopForeground(true);
                 stopSelf();
                 break;
@@ -110,34 +106,42 @@ public class RadioService extends Service {
         return START_STICKY;
     }
 
+    @OptIn(markerClass = UnstableApi.class)
     private void startPlayback(String url) {
         releasePlayer();
-        // Must call startForeground within 5 s of startForegroundService
         startForeground(NOTIFICATION_ID, buildNotification(currentStationName));
 
         if (url == null || url.isEmpty()) { stopSelf(); return; }
         if (!requestAudioFocus()) { stopSelf(); return; }
 
-        acquireWakeLock();
+        OkHttpClient httpClient = new OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS)
+                .build();
+        OkHttpDataSource.Factory dataSourceFactory = new OkHttpDataSource.Factory(httpClient);
 
-        try {
-            mediaPlayer = new MediaPlayer();
-            mediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .build());
-            // Keep CPU awake during streaming even when screen is off
-            mediaPlayer.setWakeMode(getApplicationContext(), PowerManager.PARTIAL_WAKE_LOCK);
-            mediaPlayer.setDataSource(url);
-            mediaPlayer.setOnPreparedListener(MediaPlayer::start);
-            mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+        player = new ExoPlayer.Builder(this)
+                .setMediaSourceFactory(new DefaultMediaSourceFactory(dataSourceFactory))
+                .build();
+
+        player.setAudioAttributes(
+                new Builder()
+                        .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                        .setUsage(C.USAGE_MEDIA)
+                        .build(),
+                false // we manage audio focus ourselves
+        );
+
+        player.addListener(new Player.Listener() {
+            @Override
+            public void onPlayerError(PlaybackException error) {
                 stopSelf();
-                return true;
-            });
-            mediaPlayer.prepareAsync();
-        } catch (Exception e) {
-            stopSelf();
-        }
+            }
+        });
+
+        player.setMediaItem(MediaItem.fromUri(url));
+        player.prepare();
+        player.setPlayWhenReady(true);
     }
 
     private boolean requestAudioFocus() {
@@ -172,25 +176,11 @@ public class RadioService extends Service {
         hasAudioFocus = false;
     }
 
-    private void acquireWakeLock() {
-        if (wakeLock != null && wakeLock.isHeld()) return;
-        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "RadioAjay:playback");
-        wakeLock.acquire(4 * 60 * 60 * 1000L); // 4-hour ceiling; released on stop/destroy
-    }
-
-    private void releaseWakeLock() {
-        if (wakeLock != null && wakeLock.isHeld()) {
-            wakeLock.release();
-            wakeLock = null;
-        }
-    }
-
     private void releasePlayer() {
-        if (mediaPlayer != null) {
-            try { mediaPlayer.stop(); } catch (Exception ignored) {}
-            mediaPlayer.release();
-            mediaPlayer = null;
+        if (player != null) {
+            player.stop();
+            player.release();
+            player = null;
         }
     }
 
@@ -229,7 +219,6 @@ public class RadioService extends Service {
     public void onDestroy() {
         releasePlayer();
         abandonAudioFocus();
-        releaseWakeLock();
         super.onDestroy();
     }
 }
