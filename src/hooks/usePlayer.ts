@@ -1,6 +1,17 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import type { Station, PlayerState } from '../types';
 import { recordClick } from '../api/radioBrowser';
+
+interface NativeAudioPlugin {
+  play(options: { url: string; stationName: string }): Promise<void>;
+  pause(): Promise<void>;
+  resume(): Promise<void>;
+  stop(): Promise<void>;
+}
+
+const NativeAudio = registerPlugin<NativeAudioPlugin>('Audio');
+const isAndroid = Capacitor.getPlatform() === 'android';
 
 function updateMediaSession(station: Station, isPlaying: boolean) {
   if (!('mediaSession' in navigator)) return;
@@ -26,7 +37,6 @@ export function usePlayer() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Expose handlers so Media Session can call them
   const handlersRef = useRef({ togglePlay: () => {}, next: () => {}, prev: () => {} });
 
   useEffect(() => {
@@ -48,40 +58,63 @@ export function usePlayer() {
     return () => {
       audio.pause();
       audio.src = '';
+      if (isAndroid) NativeAudio.stop().catch(() => {});
     };
   }, []);
 
   const play = useCallback((station: Station) => {
-    const audio = audioRef.current;
-    audio.pause();
-    audio.src = station.url_resolved || station.url;
+    const url = station.url_resolved || station.url;
+
     setLoading(true);
     setError(null);
     setState((s) => ({ ...s, station, isPlaying: true }));
     recordClick(station.stationuuid);
     updateMediaSession(station, true);
 
-    const onPlaying = () => setLoading(false);
-    const onError = () => {
-      setLoading(false);
-      setError('Stream unavailable. Try another station.');
-      setState((s) => ({ ...s, isPlaying: false }));
-    };
+    if (isAndroid) {
+      NativeAudio.play({ url, stationName: station.name })
+        .then(() => {
+          // Give the MediaPlayer a few seconds to buffer then clear the spinner
+          setTimeout(() => setLoading(false), 3000);
+        })
+        .catch(() => {
+          setLoading(false);
+          setError('Stream unavailable. Try another station.');
+          setState((s) => ({ ...s, isPlaying: false }));
+        });
+    } else {
+      const audio = audioRef.current;
+      audio.pause();
+      audio.src = url;
 
-    audio.addEventListener('playing', onPlaying, { once: true });
-    audio.addEventListener('error', onError, { once: true });
-    audio.play().catch(() => {});
+      const onPlaying = () => setLoading(false);
+      const onError = () => {
+        setLoading(false);
+        setError('Stream unavailable. Try another station.');
+        setState((s) => ({ ...s, isPlaying: false }));
+      };
+      audio.addEventListener('playing', onPlaying, { once: true });
+      audio.addEventListener('error', onError, { once: true });
+      audio.play().catch(() => {});
+    }
   }, []);
 
   const togglePlay = useCallback(() => {
-    const audio = audioRef.current;
     setState((prev) => {
       if (prev.isPlaying) {
-        audio.pause();
+        if (isAndroid) {
+          NativeAudio.pause().catch(() => {});
+        } else {
+          audioRef.current.pause();
+        }
         if (prev.station) updateMediaSession(prev.station, false);
         return { ...prev, isPlaying: false };
       } else if (prev.station) {
-        audio.play().catch(() => {});
+        if (isAndroid) {
+          NativeAudio.resume().catch(() => {});
+        } else {
+          audioRef.current.play().catch(() => {});
+        }
         updateMediaSession(prev.station, true);
         return { ...prev, isPlaying: true };
       }
@@ -90,19 +123,17 @@ export function usePlayer() {
   }, []);
 
   const setVolume = useCallback((volume: number) => {
-    audioRef.current.volume = volume;
+    if (!isAndroid) audioRef.current.volume = volume;
     setState((s) => ({ ...s, volume, isMuted: volume === 0 }));
   }, []);
 
   const toggleMute = useCallback(() => {
-    const audio = audioRef.current;
     setState((prev) => {
-      audio.muted = !prev.isMuted;
+      if (!isAndroid) audioRef.current.muted = !prev.isMuted;
       return { ...prev, isMuted: !prev.isMuted };
     });
   }, []);
 
-  // Let App wire up next/prev so Media Session steering-wheel buttons work
   const registerMediaSessionHandlers = useCallback((next: () => void, prev: () => void) => {
     handlersRef.current.next = next;
     handlersRef.current.prev = prev;

@@ -1,6 +1,14 @@
 {
   "notifications": [
     {
+      "id": "v1-2-background-audio",
+      "type": "upgrade",
+      "title": "Background Playback Fixed",
+      "message": "Android users: radio streams now keep playing when your screen turns off or you switch apps. Update to v1.2 from the Play Store to get the fix.",
+      "date": "2026-07-02",
+      "version": "1.2"
+    },
+    {
       "id": "favourite-country",
       "type": "info",
       "title": "Set a Favourite Country",
