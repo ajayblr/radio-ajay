@@ -1,11 +1,12 @@
-﻿import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { Search, X } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import StationGrid from './components/StationGrid';
 import Player from './components/Player';
 import BottomNav from './components/BottomNav';
-import CarView from './components/CarView';
+
+const CarView = lazy(() => import('./components/CarView'));
 import { usePlayer } from './hooks/usePlayer';
 import { useFavorites } from './hooks/useFavorites';
 import { useFavoriteCountry, getFavoriteCountry } from './hooks/useFavoriteCountry';
@@ -286,11 +287,23 @@ export default function App() {
     registerMediaSessionHandlers(handleNext, handlePrev);
   }, [registerMediaSessionHandlers, handleNext, handlePrev]);
 
-  // Start anonymous session tracking (country heartbeat)
+  // Start anonymous session tracking (country heartbeat) once the browser is idle,
+  // so it doesn't compete with the initial station/country/tag/stats fetches.
   useEffect(() => {
     let cleanup = () => {};
-    startSession().then(fn => { cleanup = fn; });
-    return () => cleanup();
+    const kick = () => { startSession().then(fn => { cleanup = fn; }); };
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    if (typeof window.requestIdleCallback === 'function') {
+      idleId = window.requestIdleCallback(kick, { timeout: 3000 });
+    } else {
+      timeoutId = setTimeout(kick, 1500);
+    }
+    return () => {
+      cleanup();
+      if (idleId !== undefined) window.cancelIdleCallback?.(idleId);
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    };
   }, []);
 
   const gridTitle = useMemo(() => {
@@ -331,21 +344,23 @@ export default function App() {
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ background: 'var(--sp-bg)' }}>
       {carMode && (
-        <CarView
-          playerState={playerState}
-          loading={playerLoading}
-          error={playerError}
-          stations={displayedStations}
-          isFavorite={isFavorite}
-          onPlay={handlePlay}
-          onTogglePlay={togglePlay}
-          onNext={handleNext}
-          onPrev={handlePrev}
-          onVolume={setVolume}
-          onToggleMute={toggleMute}
-          onFavorite={() => playerState.station && handleFavorite(playerState.station)}
-          onExitCarMode={() => setCarModeExited(true)}
-        />
+        <Suspense fallback={null}>
+          <CarView
+            playerState={playerState}
+            loading={playerLoading}
+            error={playerError}
+            stations={displayedStations}
+            isFavorite={isFavorite}
+            onPlay={handlePlay}
+            onTogglePlay={togglePlay}
+            onNext={handleNext}
+            onPrev={handlePrev}
+            onVolume={setVolume}
+            onToggleMute={toggleMute}
+            onFavorite={() => playerState.station && handleFavorite(playerState.station)}
+            onExitCarMode={() => setCarModeExited(true)}
+          />
+        </Suspense>
       )}
       <div className="flex flex-1 min-h-0 gap-0 lg:gap-2 lg:p-2">
 
