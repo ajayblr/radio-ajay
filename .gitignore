@@ -28,3 +28,6 @@ dist-ssr
 # Android signing — never commit these
 *.keystore
 *.jks
+
+.vercel
+.env*
