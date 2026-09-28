@@ -111,7 +111,10 @@ export function usePlayer() {
         return { ...prev, isPlaying: false };
       } else if (prev.station) {
         if (isAndroid) {
-          NativeAudio.resume().catch(() => {});
+          // Reconnect rather than resume: the native service may have stopped since
+          // (stream error, audio focus lost), and for live radio "now" is what you want anyway
+          NativeAudio.play({ url: prev.station.url_resolved || prev.station.url, stationName: prev.station.name })
+            .catch(() => {});
         } else {
           audioRef.current.play().catch(() => {});
         }

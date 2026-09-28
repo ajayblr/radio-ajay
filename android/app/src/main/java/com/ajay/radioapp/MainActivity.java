@@ -3,7 +3,10 @@ package com.ajay.radioapp;
 import android.content.IntentSender;
 import android.os.Bundle;
 import android.view.View;
+import android.webkit.RenderProcessGoneDetail;
+import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.WebViewListener;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.android.play.core.appupdate.AppUpdateInfo;
 import com.google.android.play.core.appupdate.AppUpdateManager;
@@ -27,6 +30,17 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AudioPlugin.class);
         super.onCreate(savedInstanceState);
+
+        // Android may kill the WebView's renderer process (usually to reclaim memory while
+        // the app sits in the background playing). Capacitor's default lets that take the
+        // whole app down; instead rebuild the UI. Audio lives in RadioService and keeps playing.
+        getBridge().addWebViewListener(new WebViewListener() {
+            @Override
+            public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                runOnUiThread(MainActivity.this::recreate);
+                return true;
+            }
+        });
 
         appUpdateManager = AppUpdateManagerFactory.create(this);
         appUpdateManager.registerListener(installStateListener);
