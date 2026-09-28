@@ -1,6 +1,14 @@
 {
   "notifications": [
     {
+      "id": "v1-7-refresh-and-stability",
+      "type": "upgrade",
+      "title": "Fresh New Look & Crash Fix",
+      "message": "Android users: fixed a crash that could close the app after pausing a station whose stream had dropped. Update to v1.7 from the Play Store. Also new: Recently played and Favourites rows on Home, station logos shown in full, a header that takes on the colour of the station you're playing, and a LIVE badge in the player. The station list loads instantly from cache and scrolls more smoothly, light mode is fixed, and play buttons are always visible on touch screens.",
+      "date": "2026-09-28",
+      "version": "1.7"
+    },
+    {
       "id": "v1-2-background-audio",
       "type": "upgrade",
       "title": "Background Playback Fixed",
