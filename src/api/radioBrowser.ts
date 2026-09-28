@@ -8,27 +8,92 @@ const SERVERS = [
 
 let activeServer = SERVERS[0];
 
-// localStorage cache for slow-changing data so subsequent visits load instantly
+// localStorage cache, stale-while-revalidate: within the TTL an entry is used
+// without touching the network; past it, callers can still show it instantly
+// (peek*) while a fresh copy is fetched, and fall back to it if the fetch fails.
 const CACHE_TTL_MS = {
   countries: 24 * 60 * 60 * 1000,  // 24 h — country list barely changes
   tags:      24 * 60 * 60 * 1000,  // 24 h
   stats:      5 * 60 * 1000,        // 5 min
-  stations:  15 * 60 * 1000,        // 15 min for the default first-page
+  stations:  15 * 60 * 1000,        // 15 min for first pages
 };
+// Stale entries older than this are too out of date to show at all
+const MAX_STALE_MS = 7 * 24 * 60 * 60 * 1000;
 
-function lsGet<T>(key: string, ttlMs: number): T | null {
+function lsRead<T>(key: string): { data: T; age: number } | null {
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const { ts, data } = JSON.parse(raw) as { ts: number; data: T };
-    if (Date.now() - ts > ttlMs) return null;
-    return data;
+    const age = Date.now() - ts;
+    return age > MAX_STALE_MS ? null : { data, age };
   } catch { return null; }
+}
+
+function lsGet<T>(key: string, ttlMs: number): T | null {
+  const hit = lsRead<T>(key);
+  return hit && hit.age <= ttlMs ? hit.data : null;
 }
 
 function lsSet(key: string, data: unknown): void {
   try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch {}
 }
+
+/** Fetch with cache: fresh hit skips the network; on network failure, serve stale. */
+async function cached<T>(key: string, ttlMs: number, fetcher: () => Promise<T>, shouldStore: (d: T) => boolean): Promise<T> {
+  const fresh = lsGet<T>(key, ttlMs);
+  if (fresh) return fresh;
+  try {
+    const data = await fetcher();
+    if (shouldStore(data)) lsSet(key, data);
+    return data;
+  } catch (err) {
+    const stale = lsRead<T>(key);
+    if (stale) return stale.data;
+    throw err;
+  }
+}
+
+// ── First-page station cache ─────────────────────────────────────────────────
+// Default list plus country/genre first pages; name searches aren't cached.
+// Kept to a handful of pages (LRU) and trimmed to the fields the app uses,
+// so localStorage stays well under quota.
+const PAGE_INDEX_KEY = 'radio_page_keys';
+const MAX_CACHED_PAGES = 6;
+
+function pageKey(country?: string, tag?: string) {
+  return !country && !tag ? 'radio_stations_p0' : `radio_stations_p0_${country ?? ''}|${tag ?? ''}`;
+}
+
+function trimStation(s: Station): Station {
+  return {
+    stationuuid: s.stationuuid, name: s.name, url: s.url, url_resolved: s.url_resolved,
+    favicon: s.favicon, tags: s.tags, country: s.country, countrycode: s.countrycode,
+    state: s.state, language: s.language, codec: s.codec, bitrate: s.bitrate,
+    votes: s.votes, clickcount: s.clickcount,
+  };
+}
+
+function storePage(key: string, data: Station[]) {
+  if (!data.length) return;
+  lsSet(key, data.map(trimStation));
+  try {
+    const keys: string[] = JSON.parse(localStorage.getItem(PAGE_INDEX_KEY) || '[]');
+    const next = [key, ...keys.filter((k) => k !== key)];
+    next.slice(MAX_CACHED_PAGES).forEach((k) => localStorage.removeItem(k));
+    localStorage.setItem(PAGE_INDEX_KEY, JSON.stringify(next.slice(0, MAX_CACHED_PAGES)));
+  } catch { /* quota or private mode — cache is best-effort */ }
+}
+
+/** Cached first page for a filter, even if stale — for instant display. */
+export function peekStationsPage(filter: { country?: string; tag?: string }): { data: Station[]; fresh: boolean } | null {
+  const hit = lsRead<Station[]>(pageKey(filter.country, filter.tag));
+  return hit && hit.data.length ? { data: hit.data, fresh: hit.age <= CACHE_TTL_MS.stations } : null;
+}
+
+export function peekCountries() { return lsRead<{ name: string; stationcount: number }[]>('radio_countries')?.data ?? null; }
+export function peekTags(limit = 80) { return lsRead<{ name: string; stationcount: number }[]>(`radio_tags_${limit}`)?.data ?? null; }
+export function peekStats() { return lsRead<{ stations: number }>('radio_stats')?.data ?? null; }
 
 async function tryServers<T>(path: string): Promise<{ data: T; empty: boolean } | null> {
   let emptyResult: T | undefined;
@@ -100,7 +165,16 @@ export async function searchStations(params: SearchParams): Promise<Station[]> {
   query.set('order', params.order ?? 'clickcount');
   query.set('reverse', params.reverse !== false ? 'true' : 'false');
   query.set('hidebroken', params.hidebroken !== false ? 'true' : 'false');
-  return apiFetch<Station[]>(`/stations/search?${query.toString()}`);
+  const cacheable = !params.name && !params.state && (params.offset ?? 0) === 0;
+  if (!cacheable) return apiFetch<Station[]>(`/stations/search?${query.toString()}`);
+  const key = pageKey(params.country, params.tag);
+  return cached(key, CACHE_TTL_MS.stations,
+    async () => {
+      const data = await apiFetch<Station[]>(`/stations/search?${query.toString()}`);
+      storePage(key, data);
+      return data;
+    },
+    () => false); // storePage handles storage + LRU
 }
 
 export async function getStations(params: { limit?: number; offset?: number } = {}): Promise<Station[]> {
@@ -112,15 +186,15 @@ export async function getStations(params: { limit?: number; offset?: number } = 
   query.set('order', 'votes');
   query.set('reverse', 'true');
   query.set('hidebroken', 'true');
-  // Cache only the unfiltered first page — it's the most expensive call on slow connections
-  const cacheKey = `radio_stations_p0`;
-  if (offset === 0) {
-    const cached = lsGet<Station[]>(cacheKey, CACHE_TTL_MS.stations);
-    if (cached) return cached;
-  }
-  const data = await apiFetch<Station[]>(`/stations?${query.toString()}`);
-  if (offset === 0 && data.length > 0) lsSet(cacheKey, data);
-  return data;
+  if (offset !== 0) return apiFetch<Station[]>(`/stations?${query.toString()}`);
+  const key = pageKey();
+  return cached(key, CACHE_TTL_MS.stations,
+    async () => {
+      const data = await apiFetch<Station[]>(`/stations?${query.toString()}`);
+      storePage(key, data);
+      return data;
+    },
+    () => false);
 }
 
 export interface GlobalStats {
@@ -133,11 +207,9 @@ export interface GlobalStats {
   countries: number;
 }
 export async function getStats(): Promise<{ stations: number }> {
-  const cached = lsGet<{ stations: number }>('radio_stats', CACHE_TTL_MS.stats);
-  if (cached) return cached;
-  const data = await apiFetch<{ stations: number }>('/stats');
-  lsSet('radio_stats', data);
-  return data;
+  return cached('radio_stats', CACHE_TTL_MS.stats,
+    async () => ({ stations: (await apiFetch<{ stations: number }>('/stats')).stations }),
+    (d) => d.stations > 0);
 }
 export async function getGlobalStats(): Promise<GlobalStats> {
   return apiFetch<GlobalStats>('/stats');
@@ -147,24 +219,20 @@ export async function getTopStations(limit = 10): Promise<Station[]> {
 }
 
 export async function getCountries(): Promise<{ name: string; stationcount: number }[]> {
-  const cached = lsGet<{ name: string; stationcount: number }[]>('radio_countries', CACHE_TTL_MS.countries);
-  if (cached) return cached;
-  const data = await apiFetch<{ name: string; stationcount: number }[]>('/countries?order=stationcount&reverse=true');
-  const filtered = data.filter((c) => c.name && c.stationcount > 0);
-  if (filtered.length > 0) lsSet('radio_countries', filtered);
-  return filtered;
+  return cached('radio_countries', CACHE_TTL_MS.countries, async () => {
+    const data = await apiFetch<{ name: string; stationcount: number }[]>('/countries?order=stationcount&reverse=true');
+    // Keep only the two fields used — the raw payload also carries iso codes etc.
+    return data.filter((c) => c.name && c.stationcount > 0).map(({ name, stationcount }) => ({ name, stationcount }));
+  }, (d) => d.length > 0);
 }
 
 export async function getTags(limit = 80): Promise<{ name: string; stationcount: number }[]> {
-  const cacheKey = `radio_tags_${limit}`;
-  const cached = lsGet<{ name: string; stationcount: number }[]>(cacheKey, CACHE_TTL_MS.tags);
-  if (cached) return cached;
-  const data = await apiFetch<{ name: string; stationcount: number }[]>(
-    `/tags?order=stationcount&reverse=true&limit=${limit}`
-  );
-  const filtered = data.filter((t) => t.name && t.stationcount > 10);
-  if (filtered.length > 0) lsSet(cacheKey, filtered);
-  return filtered;
+  return cached(`radio_tags_${limit}`, CACHE_TTL_MS.tags, async () => {
+    const data = await apiFetch<{ name: string; stationcount: number }[]>(
+      `/tags?order=stationcount&reverse=true&limit=${limit}`
+    );
+    return data.filter((t) => t.name && t.stationcount > 10).map(({ name, stationcount }) => ({ name, stationcount }));
+  }, (d) => d.length > 0);
 }
 
 export async function getIndiaStates(): Promise<{ name: string; stationcount: number }[]> {

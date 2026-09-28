@@ -58,7 +58,7 @@ export default function Sidebar({
         {/* Library block */}
         <div className="rounded-lg flex flex-col flex-1 overflow-hidden min-h-0" style={{ background: 'var(--sp-surface)' }}>
           <div className={`flex items-center justify-between px-4 pt-4 pb-2 shrink-0 ${activeSection ? 'hidden lg:flex' : ''}`}>
-            <button className="flex items-center gap-3 text-sm font-semibold hover:text-white transition-colors" style={{ color: 'var(--sp-muted)' }}>
+            <button className="flex items-center gap-3 text-sm font-semibold hover:text-[var(--sp-text)] transition-colors" style={{ color: 'var(--sp-muted)' }}>
               <Library size={22} />
               Your Library
             </button>
@@ -157,7 +157,7 @@ function LibBtn({ icon: Icon, label, sub, active, onClick }: {
         <Icon size={18} className={active ? 'text-black' : ''} style={{ color: active ? undefined : 'var(--sp-muted)' }} />
       </div>
       <div className="min-w-0">
-        <p className="text-sm font-medium truncate text-white">{label}</p>
+        <p className="text-sm font-medium truncate" style={{ color: 'var(--sp-text)' }}>{label}</p>
         <p className="text-xs truncate" style={{ color: 'var(--sp-muted)' }}>{sub}</p>
       </div>
     </button>

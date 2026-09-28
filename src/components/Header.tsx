@@ -29,11 +29,12 @@ export default function Header({
 
   return (
     <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 py-3 sm:py-4 shrink-0"
-      style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%)' }}>
+      style={{ background: 'linear-gradient(to bottom, var(--sp-header-shade) 0%, transparent 100%)' }}>
 
       {/* Hamburger — mobile only */}
       <button
         onClick={onOpenSidebar}
+        aria-label="Open menu"
         className="lg:hidden w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors"
         style={{ background: 'rgba(0,0,0,0.7)' }}
       >
@@ -48,14 +49,13 @@ export default function Header({
           placeholder="Search stations..."
           value={search}
           onChange={(e) => onSearch(e.target.value)}
-          className="w-full pl-9 pr-8 py-2 sm:py-2.5 text-sm rounded-full focus:outline-none transition-all"
-          style={{ background: 'var(--sp-elevated)', color: 'var(--sp-text)', border: '1px solid transparent' }}
-          onFocus={(e) => { e.currentTarget.style.border = '1px solid white'; e.currentTarget.style.background = '#3e3e3e'; }}
-          onBlur={(e) => { e.currentTarget.style.border = '1px solid transparent'; e.currentTarget.style.background = 'var(--sp-elevated)'; }}
+          aria-label="Search stations"
+          // 16px until xl so iPad Safari doesn't zoom on focus
+          className="search-input w-full pl-9 pr-8 py-2 sm:py-2.5 text-base xl:text-sm rounded-full focus:outline-none transition-all"
         />
         {search && (
-          <button onClick={() => onSearch('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors hover:text-white"
+          <button onClick={() => onSearch('')} aria-label="Clear search"
+            className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors hover:text-[var(--sp-text)]"
             style={{ color: 'var(--sp-subtle)' }}>
             <X size={13} />
           </button>
@@ -69,10 +69,8 @@ export default function Header({
         <button
           onClick={onToggleTheme}
           title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-          className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-105"
-          style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--sp-text)' }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.2)')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+          aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+          className="chip-btn w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-105"
         >
           {dark ? <Sun size={15} /> : <Moon size={15} />}
         </button>
@@ -82,10 +80,11 @@ export default function Header({
           <button
             onClick={openPanel}
             title="Notifications"
-            className="flex w-8 h-8 rounded-full items-center justify-center transition-all hover:scale-105"
+            aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+            className={`flex w-8 h-8 rounded-full items-center justify-center transition-all hover:scale-105 ${unreadCount > 0 ? '' : 'chip-btn'}`}
             style={{
-              background: unreadCount > 0 ? 'rgba(168,85,247,0.25)' : 'rgba(255,255,255,0.1)',
-              color: unreadCount > 0 ? '#c084fc' : 'var(--sp-text)',
+              background: unreadCount > 0 ? 'rgba(168,85,247,0.25)' : undefined,
+              color: unreadCount > 0 ? '#a855f7' : undefined,
               border: unreadCount > 0 ? '1px solid rgba(168,85,247,0.55)' : '1px solid transparent',
             }}
           >

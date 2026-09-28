@@ -1,4 +1,6 @@
-import { Play, Pause, Heart, Radio } from 'lucide-react';
+import { memo } from 'react';
+import { Play, Pause, Heart } from 'lucide-react';
+import StationArt from './StationArt';
 import type { Station } from '../types';
 
 interface Props {
@@ -6,83 +8,48 @@ interface Props {
   isPlaying: boolean;
   isActive: boolean;
   isFavorite: boolean;
-  onPlay: () => void;
-  onFavorite: () => void;
+  onPlay: (s: Station) => void;
+  onFavorite: (s: Station) => void;
 }
 
-const gradients = [
-  ['#5038a0', '#3d2b7a'],
-  ['#1e3a5f', '#0d2137'],
-  ['#5c1d1d', '#3b1212'],
-  ['#1a4731', '#0d2b1d'],
-  ['#4a2060', '#2d1240'],
-  ['#3d4a1e', '#252d10'],
-  ['#1d3a4a', '#0d2130'],
-  ['#4a3020', '#2d1c10'],
-];
-
-function hashColor(str: string) {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
-  return gradients[h % gradients.length];
-}
-
-export default function StationCard({ station, isPlaying, isActive, isFavorite, onPlay, onFavorite }: Props) {
-  const [c1, c2] = hashColor(station.stationuuid);
-
+function StationCard({ station, isPlaying, isActive, isFavorite, onPlay, onFavorite }: Props) {
   return (
     <div
-      className="station-card group relative flex flex-col rounded-md p-3 cursor-pointer transition-colors duration-200"
-      style={{ background: isActive ? 'var(--sp-hover)' : 'var(--sp-surface)' }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--sp-elevated)')}
-      onMouseLeave={(e) => (e.currentTarget.style.background = isActive ? 'var(--sp-hover)' : 'var(--sp-surface)')}
-      onClick={onPlay}
+      role="button"
+      tabIndex={0}
+      aria-label={`${isActive && isPlaying ? 'Pause' : 'Play'} ${station.name}`}
+      aria-pressed={isActive && isPlaying}
+      className={`station-card group relative flex flex-col rounded-md p-3 cursor-pointer transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-[var(--sp-green)] ${isActive ? 'is-active' : ''}`}
+      onClick={() => onPlay(station)}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return; // let the inner buttons handle their own keys
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPlay(station); }
+      }}
     >
       {/* Artwork */}
       <div className="relative w-full aspect-square rounded-md overflow-hidden mb-4 shadow-lg">
-        {station.favicon ? (
-          <>
-            <img
-              src={station.favicon}
-              alt={station.name}
-              loading="lazy"
-              className="card-img w-full h-full object-cover"
-              onError={(e) => {
-                const img = e.target as HTMLImageElement;
-                img.style.display = 'none';
-                img.nextElementSibling?.classList.remove('hidden');
-              }}
-            />
-            <div className="hidden w-full h-full items-center justify-center"
-              style={{ background: `linear-gradient(135deg, ${c1}, ${c2})` }}>
-              <Radio size={36} className="text-white/50" />
-            </div>
-          </>
-        ) : (
-          <div className="w-full h-full flex items-center justify-center"
-            style={{ background: `linear-gradient(135deg, ${c1}, ${c2})` }}>
-            <Radio size={36} className="text-white/50" />
-          </div>
-        )}
+        <StationArt station={station} backdrop />
 
-        {/* Favorite */}
+        {/* Favorite — 36px hit area around a smaller visible pill */}
         <button
-          onClick={(e) => { e.stopPropagation(); onFavorite(); }}
-          className="absolute top-2 right-2 p-1 rounded-full transition-all duration-150"
-          style={{ color: isFavorite ? 'var(--sp-green)' : 'white', background: 'rgba(0,0,0,0.4)' }}
-          onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.1)')}
-          onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+          onClick={(e) => { e.stopPropagation(); onFavorite(station); }}
+          aria-label={isFavorite ? `Remove ${station.name} from favourites` : `Add ${station.name} to favourites`}
+          className="absolute top-0 right-0 w-9 h-9 flex items-center justify-center group/fav"
         >
-          <Heart size={14} fill={isFavorite ? 'currentColor' : 'none'} />
+          <span className="p-1.5 rounded-full transition-transform duration-150 group-hover/fav:scale-110"
+            style={{ color: isFavorite ? 'var(--sp-green)' : 'white', background: 'rgba(0,0,0,0.45)' }}>
+            <Heart size={15} fill={isFavorite ? 'currentColor' : 'none'} />
+          </span>
         </button>
 
         {/* Play button */}
         <button
-          onClick={(e) => { e.stopPropagation(); onPlay(); }}
-          className="card-play-btn absolute bottom-2 right-2 w-10 h-10 rounded-full flex items-center justify-center shadow-xl transition-transform hover:scale-105"
+          onClick={(e) => { e.stopPropagation(); onPlay(station); }}
+          // Visual affordance only — the card itself is the accessible play control
+          tabIndex={-1}
+          aria-hidden
+          className="card-play-btn absolute bottom-2 right-2 w-10 h-10 rounded-full flex items-center justify-center shadow-xl"
           style={{ background: 'var(--sp-green)' }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--sp-green-hov)')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--sp-green)')}
         >
           {isActive && isPlaying ? (
             <Pause size={16} className="text-black" fill="currentColor" />
@@ -102,7 +69,7 @@ export default function StationCard({ station, isPlaying, isActive, isFavorite, 
       </div>
 
       {/* Text */}
-      <p className="text-sm font-semibold line-clamp-2 leading-snug mb-1" style={{ color: isActive ? 'var(--sp-green)' : 'var(--sp-text)' }}>
+      <p className="text-sm font-semibold line-clamp-2 leading-snug mb-1 min-h-[2.5em]" style={{ color: isActive ? 'var(--sp-green)' : 'var(--sp-text)' }}>
         {station.name}
       </p>
       <p className="text-xs line-clamp-1 leading-relaxed capitalize" style={{ color: 'var(--sp-muted)' }}>
@@ -113,3 +80,7 @@ export default function StationCard({ station, isPlaying, isActive, isFavorite, 
     </div>
   );
 }
+
+// Memoized: the grid can hold hundreds of cards, and App re-renders on every
+// player change (volume, loading, play/pause). Callbacks must be stable.
+export default memo(StationCard);

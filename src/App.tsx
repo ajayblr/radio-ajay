@@ -3,6 +3,7 @@ import { Search, X } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import StationGrid from './components/StationGrid';
+import StationShelf from './components/StationShelf';
 import Player from './components/Player';
 import BottomNav from './components/BottomNav';
 
@@ -15,6 +16,7 @@ import { useTheme } from './hooks/useTheme';
 import { useCarEnvironment } from './hooks/useCarEnvironment';
 import { useNotifications } from './hooks/useNotifications';
 import { useGeoCountry } from './hooks/useGeoCountry';
+import { useStationColor } from './hooks/useStationColor';
 import { startSession, recordAppPlay } from './lib/firebaseAnalytics';
 import { logAnalyticsEvent } from './lib/firebase';
 import {
@@ -24,6 +26,10 @@ import {
   getCountries,
   getTags,
   getTopStations,
+  peekStationsPage,
+  peekCountries,
+  peekTags,
+  peekStats,
 } from './api/radioBrowser';
 import type { Station, Tab, SidebarSection } from './types';
 
@@ -68,15 +74,17 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
-  const [stations, setStations] = useState<Station[]>([]);
-  const [stationsLoading, setStationsLoading] = useState(true);
+  // Seed from the local cache (even if stale) so the first paint has content, not a spinner
+  const [initialPage] = useState(() => peekStationsPage({ country: getFavoriteCountry() ?? undefined }));
+  const [stations, setStations] = useState<Station[]>(() => initialPage?.data ?? []);
+  const [stationsLoading, setStationsLoading] = useState(!initialPage);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [totalCount, setTotalCount] = useState<number | undefined>();
+  const [totalCount, setTotalCount] = useState<number | undefined>(() => peekStats()?.stations);
   const offsetRef = useRef(0);
 
-  const [countries, setCountries] = useState<{ name: string; stationcount: number }[]>([]);
-  const [genres, setGenres] = useState<{ name: string; stationcount: number }[]>([]);
+  const [countries, setCountries] = useState<{ name: string; stationcount: number }[]>(() => peekCountries() ?? []);
+  const [genres, setGenres] = useState<{ name: string; stationcount: number }[]>(() => peekTags(80) ?? []);
 
   const [selectedCountry, setSelectedCountry] = useState<string | null>(() => getFavoriteCountry());
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
@@ -112,12 +120,23 @@ export default function App() {
   useEffect(() => {
     const params = buildParams();
     const filterKey = JSON.stringify(params);
-    offsetRef.current = 0;
-    setStations([]);
-    setHasMore(true);
-    setStationsLoading(true);
-
     const isFiltered = params.name || params.country || params.tag;
+
+    // Stale-while-revalidate: show a cached first page immediately; if it's
+    // still fresh we're done, otherwise refresh it in the background.
+    const peek = params.name ? null : peekStationsPage({ country: params.country, tag: params.tag });
+    if (peek) {
+      setStations(peek.data);
+      offsetRef.current = peek.data.length;
+      setHasMore(peek.data.length === PAGE_SIZE);
+      setStationsLoading(false);
+      if (peek.fresh) return;
+    } else {
+      offsetRef.current = 0;
+      setStations([]);
+      setHasMore(true);
+      setStationsLoading(true);
+    }
 
     const timer = setTimeout(async () => {
       if (JSON.stringify(buildParams()) !== filterKey) return;
@@ -126,12 +145,27 @@ export default function App() {
           ? await searchStations({ ...params, limit: PAGE_SIZE, offset: 0 })
           : await getStations({ limit: PAGE_SIZE, offset: 0 });
         if (JSON.stringify(buildParams()) !== filterKey) return;
-        setStations(data);
-        offsetRef.current = data.length;
-        setHasMore(data.length === PAGE_SIZE);
+        if (peek) {
+          // Swap in the fresh first page, keeping any pages scrolled in since
+          setStations((prev) => {
+            const ids = new Set(data.map((s) => s.stationuuid));
+            return [...data, ...prev.slice(peek.data.length).filter((s) => !ids.has(s.stationuuid))];
+          });
+          if (offsetRef.current <= peek.data.length) {
+            offsetRef.current = data.length;
+            setHasMore(data.length === PAGE_SIZE);
+          }
+        } else {
+          setStations(data);
+          offsetRef.current = data.length;
+          setHasMore(data.length === PAGE_SIZE);
+        }
       } catch {
-        setStations([]);
-        setHasMore(false);
+        // Keep showing the stale page if we had one
+        if (!peek) {
+          setStations([]);
+          setHasMore(false);
+        }
       } finally {
         setStationsLoading(false);
       }
@@ -162,8 +196,14 @@ export default function App() {
     }
   }, [loadingMore, hasMore, stationsLoading, buildParams]);
 
+  // Refs keep the play/favourite callbacks stable so memoized StationCards don't re-render
+  const currentStationRef = useRef(playerState.station);
+  useEffect(() => { currentStationRef.current = playerState.station; }, [playerState.station]);
+  const isFavoriteRef = useRef(isFavorite);
+  useEffect(() => { isFavoriteRef.current = isFavorite; }, [isFavorite]);
+
   const handlePlay = useCallback((station: Station) => {
-    if (playerState.station?.stationuuid === station.stationuuid) {
+    if (currentStationRef.current?.stationuuid === station.stationuuid) {
       togglePlay();
     } else {
       play(station);
@@ -175,16 +215,16 @@ export default function App() {
         genre: station.tags,
       });
     }
-  }, [playerState.station, play, togglePlay, addRecent]);
+  }, [play, togglePlay, addRecent]);
 
   const handleFavorite = useCallback((station: Station) => {
-    const willBeFavorite = !isFavorite(station.stationuuid);
+    const willBeFavorite = !isFavoriteRef.current(station.stationuuid);
     toggleFavorite(station);
     logAnalyticsEvent(willBeFavorite ? 'add_to_favorites' : 'remove_from_favorites', {
       station_name: station.name,
       country: station.country,
     });
-  }, [toggleFavorite, isFavorite]);
+  }, [toggleFavorite]);
 
   const handleSection = useCallback((section: SidebarSection) => {
     setActiveSection((prev) => prev === section ? null : section);
@@ -259,8 +299,6 @@ export default function App() {
   // Refs so next/prev callbacks stay stable and never re-render Player
   const displayedStationsRef = useRef(displayedStations);
   useEffect(() => { displayedStationsRef.current = displayedStations; }, [displayedStations]);
-  const currentStationRef = useRef(playerState.station);
-  useEffect(() => { currentStationRef.current = playerState.station; }, [playerState.station]);
 
   const handleNext = useCallback(() => {
     const list = displayedStationsRef.current;
@@ -331,18 +369,43 @@ export default function App() {
     return totalCount;
   }, [activeTab, search, selectedCountry, selectedGenre, favorites.length, recent.length, topStations.length, stations.length, countries, genres, totalCount]);
 
-  // Derive a bg accent color for the top gradient from active station or section
-  const accentBg = selectedCountry || selectedGenre
-    ? '#1a3a2a'
+  // Hero gradient: tinted by the current station's logo colour once one is playing,
+  // otherwise a per-section colour. color-mix keeps the tint legible in both themes.
+  const stationColor = useStationColor(playerState.station);
+  const accentBg = stationColor
+    ? `color-mix(in srgb, ${stationColor} var(--sp-tint-strength), var(--sp-surface))`
+    : selectedCountry || selectedGenre
+    ? 'var(--sp-hero-filter)'
     : activeTab === 'favorites'
-    ? '#3a1a2a'
-    : '#1a1a3a';
+    ? 'var(--sp-hero-fav)'
+    : 'var(--sp-hero)';
+
+  // Home (no tab, filter or search): quick-access shelves above the main grid
+  const isHome = activeTab === 'all' && !search && !selectedCountry && !selectedGenre;
+  const showShelves = isHome && (recent.length > 0 || favorites.length > 0);
+  const homeShelves = showShelves ? (
+    <>
+      <StationShelf title="Recently played" stations={recent.slice(0, 12)}
+        activeStation={playerState.station} isPlaying={playerState.isPlaying}
+        isFavorite={isFavorite} onPlay={handlePlay} onFavorite={handleFavorite}
+        onShowAll={() => handleTab('recent')} />
+      <StationShelf title="Your favourites" stations={favorites.slice(0, 12)}
+        activeStation={playerState.station} isPlaying={playerState.isPlaying}
+        isFavorite={isFavorite} onPlay={handlePlay} onFavorite={handleFavorite}
+        onShowAll={() => handleTab('favorites')} />
+    </>
+  ) : null;
 
   // Close sidebar when a filter is selected on mobile
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ background: 'var(--sp-bg)' }}>
+    <div className="flex flex-col h-full overflow-hidden" style={{
+      background: 'var(--sp-bg)',
+      paddingTop: 'env(safe-area-inset-top, 0px)',
+      paddingLeft: 'env(safe-area-inset-left, 0px)',
+      paddingRight: 'env(safe-area-inset-right, 0px)',
+    }}>
       {carMode && (
         <Suspense fallback={null}>
           <CarView
@@ -412,21 +475,20 @@ export default function App() {
                     placeholder="Search stations..."
                     value={search}
                     onChange={(e) => handleSearch(e.target.value)}
-                    className="w-full pl-9 pr-8 py-2.5 text-sm rounded-full focus:outline-none transition-all"
-                    style={{ background: 'var(--sp-elevated)', color: 'var(--sp-text)', border: '1px solid transparent' }}
-                    onFocus={(e) => { e.currentTarget.style.border = '1px solid white'; e.currentTarget.style.background = '#3e3e3e'; }}
-                    onBlur={(e) => { e.currentTarget.style.border = '1px solid transparent'; e.currentTarget.style.background = 'var(--sp-elevated)'; }}
+                    aria-label="Search stations"
+                    // 16px text stops iOS from zooming the page when the field is focused
+                    className="search-input w-full pl-9 pr-8 py-2.5 text-base rounded-full focus:outline-none transition-all"
                   />
                   {search && (
-                    <button onClick={() => handleSearch('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors hover:text-white"
+                    <button onClick={() => handleSearch('')} aria-label="Clear search"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors hover:text-[var(--sp-text)]"
                       style={{ color: 'var(--sp-subtle)' }}>
                       <X size={13} />
                     </button>
                   )}
                 </div>
               )}
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">{gridTitle}</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--sp-text)' }}>{gridTitle}</h1>
               {displayTotal && (
                 <p className="text-sm mt-1" style={{ color: 'var(--sp-muted)' }}>
                   {displayTotal.toLocaleString()} stations available
@@ -437,6 +499,8 @@ export default function App() {
 
           {/* Station grid */}
           <StationGrid
+            // New list → fresh grid scrolled to the top (the cached page can now appear without a loading unmount)
+            key={`${activeTab}|${search}|${selectedCountry ?? ''}|${selectedGenre ?? ''}`}
             stations={displayedStations}
             loading={isGridLoading}
             loadingMore={showLoadingMore}
@@ -447,13 +511,14 @@ export default function App() {
             isFavorite={isFavorite}
             onPlay={handlePlay}
             onFavorite={handleFavorite}
-            totalCount={displayTotal}
+            header={homeShelves}
+            title={showShelves ? 'Popular stations' : undefined}
             onRetry={retry}
           />
         </main>
       </div>
 
-      {/* Bottom nav â€” mobile only */}
+      {/* Bottom nav — mobile only */}
       <BottomNav
         activeTab={activeTab}
         onTab={handleTab}
